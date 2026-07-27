@@ -85,6 +85,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:po
   .ptw-chart-card{padding:14px 12px!important}
   /* --- Unclosed lists --- */
   .ptw-unclosed-grid{grid-template-columns:1fr!important}
+  .ptw-dash-tbl{display:none!important}
+  .ptw-dash-cards{display:flex!important}
+  /* --- Table view: holder sub-line --- */
+  .tbl-holder-sub{display:block!important}
   /* --- Table view --- */
   .ptw-table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
   /* --- Form --- */
@@ -1296,7 +1300,7 @@ function App(){
                     <td className="tbl-hide-m" style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{r.applicant||"—"}</td>
                     <td className="tbl-hide-m" style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{r.holder||"—"}</td>
                     <td style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{(r.location||"")}</td>
-                    <td style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{r.workDescription||"—"}</td>
+                    <td style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{r.workDescription||"—"}{r.holder&&<span className="tbl-holder-sub" style={{display:"none",fontSize:9,color:c.dim,marginTop:3}}>👤 {r.holder}</span>}</td>
                     <td style={tdS}><div style={{display:"flex",gap:2,flexWrap:"wrap"}}>{certs.length?certs.map((x,j)=><span key={j} style={{fontSize:8,background:"#34d39918",color:"#34d399",padding:"1px 4px",borderRadius:3,whiteSpace:"nowrap"}}>{x}</span>):<span style={{color:c.dim,fontSize:9}}>—</span>}</div></td>
                     <td style={tdS}><div style={{display:"flex",gap:3,flexWrap:"nowrap"}}>
                       {isAuth&&<button onClick={()=>{setForm({...r});setEditIdx(records.findIndex(x=>x.ptwNumber===r.ptwNumber));setView("form")}} style={ab(c.accent)} title="編輯">✏️</button>}
@@ -1582,18 +1586,32 @@ function DashboardView({records,persons,c,isAuth,onAdd,companies,coAlias}){
           <span style={{fontSize:13,fontWeight:800}}>執行中PTW Live</span>
           <span style={{fontSize:12,color:c.success,fontWeight:700}}>({unclosedActive.length})</span>
         </div>
-        <table style={{width:"100%",minWidth:500,borderCollapse:"separate",borderSpacing:"0 3px",fontSize:12}}>
-          <thead><tr>{["PTW No.","公司","到期日","區域","描述"].map(h=><th key={h} style={{padding:"6px 8px",fontSize:10,fontWeight:700,color:c.dim,textAlign:"left",borderBottom:"1px solid "+c.border}}>{h}</th>)}</tr></thead>
+        <table className="ptw-dash-tbl" style={{width:"100%",minWidth:500,borderCollapse:"separate",borderSpacing:"0 3px",fontSize:12}}>
+          <thead><tr>{["PTW No.","公司","持有人","到期日","區域","描述"].map(h=><th key={h} style={{padding:"6px 8px",fontSize:10,fontWeight:700,color:c.dim,textAlign:"left",borderBottom:"1px solid "+c.border}}>{h}</th>)}</tr></thead>
           <tbody>{unclosedActive.map((r,i)=>(
             <tr key={r.ptwNumber+i} style={{background:i%2===0?c.success+"08":"transparent"}}>
               <td style={{padding:"7px 8px"}}><span style={{fontWeight:800,color:c.success,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{r.ptwNumber}</span></td>
               <td style={{padding:"7px 8px"}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:c.accent+"18",color:c.accent}}>{r.applyCompany}</span></td>
+              <td style={{padding:"7px 8px",fontSize:10}}>{r.holder||"—"}</td>
               <td style={{padding:"7px 8px",fontSize:11}}><span style={{color:c.success,fontWeight:700}}>{fmtD(r.validDate)}</span></td>
               <td style={{padding:"7px 8px",fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{(r.location||"")}</td>
               <td style={{padding:"7px 8px",fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{r.workDescription||"—"}</td>
             </tr>
           ))}</tbody>
         </table>
+        <div className="ptw-dash-cards" style={{display:"none",flexDirection:"column",gap:8}}>
+          {unclosedActive.map((r,i)=>(
+            <div key={r.ptwNumber+i} style={{padding:"12px 14px",borderRadius:10,background:c.success+"08",border:"1px solid "+c.success+"22"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <span style={{fontWeight:800,color:c.success,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{r.ptwNumber}</span>
+                <span style={{padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:700,background:c.accent+"18",color:c.accent}}>{r.applyCompany}</span>
+              </div>
+              {r.holder&&<div style={{fontSize:11,marginBottom:4}}>👤 <span style={{fontWeight:600}}>{r.holder}</span></div>}
+              <div style={{fontSize:10,color:c.dim,marginBottom:3}}>到期 <span style={{color:c.success,fontWeight:700}}>{fmtD(r.validDate)}</span>{r.location&&<span> · {r.location}</span>}</div>
+              <div style={{fontSize:10,color:c.text,lineHeight:1.4}}>{r.workDescription||"—"}</div>
+            </div>
+          ))}
+        </div>
       </div>}
       {unclosedExpired.length>0&&<div style={{background:c.card,borderRadius:14,border:"1px solid "+c.danger+"44",padding:"18px 22px",overflowX:"auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
@@ -1601,18 +1619,32 @@ function DashboardView({records,persons,c,isAuth,onAdd,companies,coAlias}){
           <span style={{fontSize:13,fontWeight:800}}>逾期未關 Overdue</span>
           <span style={{fontSize:12,color:c.danger,fontWeight:700}}>({unclosedExpired.length})</span>
         </div>
-        <table style={{width:"100%",minWidth:500,borderCollapse:"separate",borderSpacing:"0 3px",fontSize:12}}>
-          <thead><tr>{["PTW No.","公司","到期日","區域","描述"].map(h=><th key={h} style={{padding:"6px 8px",fontSize:10,fontWeight:700,color:c.dim,textAlign:"left",borderBottom:"1px solid "+c.border}}>{h}</th>)}</tr></thead>
+        <table className="ptw-dash-tbl" style={{width:"100%",minWidth:500,borderCollapse:"separate",borderSpacing:"0 3px",fontSize:12}}>
+          <thead><tr>{["PTW No.","公司","持有人","到期日","區域","描述"].map(h=><th key={h} style={{padding:"6px 8px",fontSize:10,fontWeight:700,color:c.dim,textAlign:"left",borderBottom:"1px solid "+c.border}}>{h}</th>)}</tr></thead>
           <tbody>{unclosedExpired.map((r,i)=>(
             <tr key={r.ptwNumber+i} style={{background:i%2===0?c.danger+"08":"transparent"}}>
               <td style={{padding:"7px 8px"}}><span style={{fontWeight:800,color:c.danger,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{r.ptwNumber}</span></td>
               <td style={{padding:"7px 8px"}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:c.accent+"18",color:c.accent}}>{r.applyCompany}</span></td>
+              <td style={{padding:"7px 8px",fontSize:10}}>{r.holder||"—"}</td>
               <td style={{padding:"7px 8px",fontSize:11}}><span style={{background:c.danger,color:"#fff",padding:"2px 8px",borderRadius:4,fontWeight:700}}>{fmtD(r.validDate)}</span></td>
               <td style={{padding:"7px 8px",fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{(r.location||"")}</td>
               <td style={{padding:"7px 8px",fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{r.workDescription||"—"}</td>
             </tr>
           ))}</tbody>
         </table>
+        <div className="ptw-dash-cards" style={{display:"none",flexDirection:"column",gap:8}}>
+          {unclosedExpired.map((r,i)=>(
+            <div key={r.ptwNumber+i} style={{padding:"12px 14px",borderRadius:10,background:c.danger+"08",border:"1px solid "+c.danger+"22"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <span style={{fontWeight:800,color:c.danger,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{r.ptwNumber}</span>
+                <span style={{padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:700,background:c.accent+"18",color:c.accent}}>{r.applyCompany}</span>
+              </div>
+              {r.holder&&<div style={{fontSize:11,marginBottom:4}}>👤 <span style={{fontWeight:600}}>{r.holder}</span></div>}
+              <div style={{fontSize:10,color:c.dim,marginBottom:3}}>到期 <span style={{background:c.danger,color:"#fff",padding:"1px 6px",borderRadius:3,fontWeight:700,fontSize:9}}>{fmtD(r.validDate)}</span>{r.location&&<span> · {r.location}</span>}</div>
+              <div style={{fontSize:10,color:c.text,lineHeight:1.4}}>{r.workDescription||"—"}</div>
+            </div>
+          ))}
+        </div>
       </div>}
     </div>}
     <div className="ptw-chart-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24}}>
