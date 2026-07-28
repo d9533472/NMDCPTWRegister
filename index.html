@@ -904,6 +904,7 @@ function App(){
   const [companies,setCompanies]=useState(()=>loadCos());
   const [coAlias,setCoAlias]=useState(()=>loadAlias());
   const [showCoMgr,setShowCoMgr]=useState(false);
+  const [showMore,setShowMore]=useState(false);
   const [newCoName,setNewCoName]=useState("");
   const [newCoAlias,setNewCoAlias]=useState("");
   const [persons,setPersons]=useState(()=>loadPersons());
@@ -1174,15 +1175,31 @@ function App(){
           <div className="ptw-sep" style={{width:1,height:24,background:c.border,margin:"0 6px"}}/>
           <button onClick={doManualSync} disabled={cloudLoading} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:cloudLoading?"not-allowed":"pointer",fontSize:12,fontWeight:700,background:"#06b6d422",color:"#06b6d4",opacity:cloudLoading?0.5:1}}>🔄 同步表單</button>
           {isAuth&&<button onClick={doSave} disabled={cloudLoading} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:cloudLoading?"not-allowed":"pointer",fontSize:12,fontWeight:700,background:"#34d39922",color:"#34d399",opacity:cloudLoading?0.5:1}}>{cloudLoading?"⏳ 同步中...":"💾 儲存"}</button>}
-          {isAuth&&<button onClick={()=>setShowSync(true)} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:"#8b5cf622",color:"#a78bfa"}}>☁️ 雲端</button>}
-          {isAuth&&<button onClick={()=>setShowRestore(true)} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:500,background:"transparent",color:c.dim}}>⏪ 還原</button>}
-          {isAuth&&<button onClick={()=>setShowCoMgr(true)} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:"#f59e0b22",color:"#f59e0b"}}>🏢 廠商</button>}
-          {isAuth&&<button onClick={doExport} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:"#06b6d422",color:"#06b6d4"}}>📦 匯出</button>}
-          {isAuth&&<button onClick={()=>importRef.current&&importRef.current.click()} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:"#f4726022",color:"#fb7185"}}>📥 匯入</button>}
+          {isAuth&&<div style={{position:"relative"}}>
+            <button onClick={()=>setShowMore(!showMore)} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:showMore?c.accent+"33":c.input,color:showMore?c.accent:c.dim}}>⋯ 更多</button>
+            {showMore&&<><div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:99}} onClick={()=>setShowMore(false)}/><div style={{position:"absolute",top:"110%",right:0,background:c.card,border:"1px solid "+c.border,borderRadius:12,padding:"6px",minWidth:160,boxShadow:"0 12px 40px rgba(0,0,0,.5)",zIndex:100}}>
+              {[
+                {icon:"☁️",label:"雲端同步",color:"#a78bfa",action:()=>{setShowSync(true);setShowMore(false)}},
+                {icon:"📦",label:"匯出備份",color:"#06b6d4",action:()=>{doExport();setShowMore(false)}},
+                {icon:"📥",label:"匯入資料",color:"#fb7185",action:()=>{importRef.current&&importRef.current.click();setShowMore(false)}},
+                {icon:"🏢",label:"廠商管理",color:"#f59e0b",action:()=>{setShowCoMgr(true);setShowMore(false)}},
+                {icon:"⏪",label:"還原紀錄",color:c.dim,action:()=>{setShowRestore(true);setShowMore(false)}},
+              ].map((item,i)=>
+                <button key={i} onClick={item.action} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 14px",borderRadius:8,border:"none",background:"transparent",color:c.text,cursor:"pointer",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=c.input} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <span style={{fontSize:15}}>{item.icon}</span>
+                  <span style={{color:item.color}}>{item.label}</span>
+                </button>
+              )}
+              <div style={{height:1,background:c.border,margin:"4px 8px"}}/>
+              <button onClick={()=>{doLogout();setShowMore(false)}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 14px",borderRadius:8,border:"none",background:"transparent",color:c.danger,cursor:"pointer",fontSize:12,fontWeight:700,textAlign:"left"}}
+                onMouseEnter={e=>e.currentTarget.style.background=c.danger+"11"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{fontSize:15}}>🔒</span><span>登出</span>
+              </button>
+            </div></>}
+          </div>}
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{doImport(e.target.files[0]);e.target.value=""}}/>
-          <div className="ptw-sep" style={{width:1,height:24,background:c.border,margin:"0 6px"}}/>
-          {isAuth?<button onClick={doLogout} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:c.danger+"22",color:c.danger}}>🔒 登出</button>
-          :<button onClick={()=>{setShowLogin(true);setLoginErr("")}} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:c.accent+"22",color:c.accent}}>🔑 登入</button>}
+          {!isAuth&&<button onClick={()=>{setShowLogin(true);setLoginErr("")}} style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:c.accent+"22",color:c.accent}}>🔑 登入</button>}
         </nav>
       </header>
 
