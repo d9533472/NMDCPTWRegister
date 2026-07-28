@@ -89,6 +89,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:po
   .ptw-dash-cards{display:flex!important}
   /* --- Table view: holder sub-line --- */
   .tbl-holder-sub{display:block!important}
+  .ptw-tbl-desktop{display:none!important}
+  .ptw-tbl-cards{display:flex!important}
   /* --- Table view --- */
   .ptw-table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
   /* --- Form --- */
@@ -1289,6 +1291,7 @@ function App(){
                 <button onClick={()=>{tblQuickWeek(0);setPage(0)}} style={{padding:"4px 10px",borderRadius:6,border:"none",background:c.accent+"22",color:c.accent,cursor:"pointer",fontSize:11,fontWeight:700}}>本週</button>
               </>}
             </div>
+            <div className="ptw-tbl-desktop">
             <div ref={topScrollRef} onScroll={()=>{if(tblScrollRef.current)syncScroll(topScrollRef.current,tblScrollRef.current)}} style={{overflowX:"auto",overflowY:"hidden",height:12,marginBottom:-1}}>
               <div className="tbl-scroll-spacer" style={{width:1100,height:1}}/>
             </div>
@@ -1361,6 +1364,40 @@ function App(){
                   </tr>
                 )})}</tbody>
             </table>
+            </div>
+            </div>
+            <div className="ptw-tbl-cards" style={{display:"none",flexDirection:"column",gap:8}}>
+              {pageData.map((r,i)=>{
+                const certs=CATS.filter(x=>r[x.key]&&r[x.key].trim()).map(x=>x.zh);
+                const isOpen=!r.closingDate||r.closingDate.trim()==="";
+                const isExpired=r.validDate&&new Date(r.validDate)<new Date();
+                const fc=fmtClose(r.closingDate,r.validDate);
+                return(
+                  <div key={r.ptwNumber+i} style={{padding:"12px 14px",borderRadius:10,background:isOpen&&isExpired?c.danger+"08":c.card,border:"1px solid "+(isOpen&&isExpired?c.danger+"33":c.border)}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontWeight:800,color:c.accent,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{r.ptwNumber}</span>
+                        <span style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,background:c.accent+"18",color:c.accent}}>{r.applyCompany}</span>
+                      </div>
+                      <span style={{fontSize:9,fontWeight:700,color:fc.color,background:fc.isClosed?"transparent":isOpen&&isExpired?c.danger+"18":c.success+"18",padding:"2px 6px",borderRadius:4}}>{fc.text}</span>
+                    </div>
+                    <div style={{fontSize:10,color:c.dim,marginBottom:4,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span>發證 {fmtD(r.issuingDate)}</span>
+                      <span>到期 <span style={{color:isOpen&&isExpired?c.danger:c.text,fontWeight:isOpen&&isExpired?700:400}}>{fmtD(r.validDate)}</span></span>
+                      {fc.isClosed&&<span>關閉 {fc.text}</span>}
+                    </div>
+                    {r.holder&&<div style={{fontSize:10,marginBottom:3}}>👤 <span style={{fontWeight:600}}>{r.holder}</span>{r.applicant&&r.applicant!==r.holder&&<span style={{color:c.dim}}> / 申請：{r.applicant}</span>}</div>}
+                    {r.location&&<div style={{fontSize:10,color:c.dim,marginBottom:3}}>📍 {r.location}</div>}
+                    <div style={{fontSize:10,lineHeight:1.4,marginBottom:certs.length||isAuth?6:0}}>{r.workDescription||"—"}</div>
+                    {certs.length>0&&<div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:isAuth?6:0}}>{certs.map((x,j)=><span key={j} style={{fontSize:8,background:"#34d39918",color:"#34d399",padding:"1px 5px",borderRadius:3}}>{x}</span>)}</div>}
+                    {isAuth&&<div style={{display:"flex",gap:6,marginTop:4,borderTop:"1px solid "+c.border,paddingTop:8}}>
+                      <button onClick={()=>{setForm({...r});setEditIdx(records.findIndex(x=>x.ptwNumber===r.ptwNumber));setView("form")}} style={{...ab(c.accent),fontSize:11,padding:"4px 10px"}}>✏️ 編輯</button>
+                      <button onClick={()=>{setForm({...r});setView("preview")}} style={{...ab("#a78bfa"),fontSize:11,padding:"4px 10px"}}>👁 預覽</button>
+                      {isOpen&&<button onClick={()=>{const ri=records.findIndex(x=>x.ptwNumber===r.ptwNumber);setClosingIdx(ri);setCloseDate(new Date().toISOString().slice(0,10))}} style={{...ab("#fbbf24"),fontSize:11,padding:"4px 10px"}}>🔒 關閉</button>}
+                      <button onClick={()=>askConfirm("確定刪除 "+r.ptwNumber+"？",()=>{setRecords(x=>x.filter(v=>v.ptwNumber!==r.ptwNumber));show("已刪除 "+r.ptwNumber)})} style={{...ab(c.danger),fontSize:11,padding:"4px 10px",marginLeft:"auto"}}>🗑</button>
+                    </div>}
+                  </div>
+                )})}
             </div>
             {totalPages>1&&<div style={{display:"flex",justifyContent:"center",gap:6,marginTop:16,alignItems:"center"}}>
               <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{...pgB,opacity:page===0?.4:1}}>◀</button>
