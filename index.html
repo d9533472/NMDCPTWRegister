@@ -145,7 +145,7 @@ const CATS=[
   {key:"coldWork",en:"Cold Work",zh:"一般作業",pre:"CWC"},
 ];
 
-/* ===== 高風險作業類別 (純勾選，不編號) ===== */
+/* ===== 90 Days Verification 90 天驗證計畫 (純勾選，不編號) ===== */
 /* zh/en = 表單用全名； zs/es = 輸出欄位用簡稱 */
 const WORK_TYPES=[
   {key:"lift",     zh:"吊掛作業(一般及關鍵吊掛)", en:"Lifting Operations (General & Critical Lifts)", zs:"吊掛作業",     es:"Lifting"},
@@ -164,7 +164,8 @@ const WORK_TYPES=[
 /* 紀錄裡以逗號分隔的 key 字串保存，例如 "lift,height" */
 const wtKeys=(v)=>String(v||"").split(",").map(s=>s.trim()).filter(Boolean);
 const wtItems=(v)=>wtKeys(v).map(k=>WORK_TYPES.find(w=>w.key===k)).filter(Boolean);
-const wtLines=(v)=>wtItems(v).map(w=>w.zs+" "+w.es);
+const wtNo=(w)=>String(WORK_TYPES.indexOf(w)+1).padStart(2,"0");
+const wtLines=(v)=>wtItems(v).map(w=>wtNo(w)+". "+w.zs+" "+w.es);
 const wtText=(v,sep)=>wtLines(v).join(sep||"\n");
 
 const empty={srNo:"",contPtwNo:"-",applyCompany:"",ptwNumber:"",issuingDate:"",closingDate:"",issuingPerson:"",startDate:"",validDate:"",applicant:"",holder:"",supervisor:"",ehs:"",location:"",workDescription:"",workTypes:"",hotWork:"",electrical:"",processIsolation:"",diving:"",radiography:"",confinedSpace:"",excavation:"",coldWork:""};
@@ -183,9 +184,9 @@ const getPersonCos=(ptwCo,aliasMap)=>{if(!ptwCo)return null;const al=aliasMap||D
 function exportTablePDF(filtered,mode,subtitle,fmtD){
   const rows=filtered.map(r=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.processIsolation||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""]});
   const heads=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"];
-  /* 週報格式才多一欄「作業類別」 */
+  /* 週報格式才多一欄「90 天驗證計畫」 */
   if(mode==="weekly"){
-    heads.push("Work Category 作業類別");
+    heads.push("90 Days Verification 90天驗證計畫");
     rows.forEach((r,i)=>r.push(wtLines(filtered[i].workTypes).join("<br>")));
   }
   let html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>PTW Register</title><style>
@@ -239,7 +240,7 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
   </style></head><body>
   <h2>PTW Weekly Status Update</h2>
   <div class="sub">Generated: ${new Date().toLocaleDateString()}</div>
-  <table><thead><tr><th style="width:10%">Company</th><th style="width:15%">Location</th><th style="width:26%">Description</th><th style="width:7%">PTW No.</th><th style="width:11%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:12%">Unclosed</th><th style="width:19%">Work Category<br><span style="font-size:7px;font-weight:400">作業類別</span></th></tr></thead><tbody>`;
+  <table><thead><tr><th style="width:10%">Company</th><th style="width:15%">Location</th><th style="width:26%">Description</th><th style="width:7%">PTW No.</th><th style="width:11%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:12%">Unclosed</th><th style="width:19%">90 Days Verification<br><span style="font-size:7px;font-weight:400">90 天驗證計畫</span></th></tr></thead><tbody>`;
   rows.forEach(co=>{
     const uc=getUnclosed(co.company);
     co.items.forEach((item,ii)=>{
@@ -349,7 +350,7 @@ function generateWeeklySummary(records,companies){
         // show most recent active, or latest if still valid
         const activeRecs=sorted.filter(r=>!r.closingDate||r.closingDate.trim()==="");
         const show=activeRecs.length?activeRecs[0]:latest;
-        /* 同地點所有仍在執行的 PTW 之作業類別聯集 */
+        /* 同地點所有仍在執行的 PTW 之 90 天驗證計畫項目聯集 */
         const wtSrc=activeRecs.length?activeRecs:[latest];
         const wtUnion=[];
         wtSrc.forEach(r=>wtKeys(r.workTypes).forEach(k=>{if(!wtUnion.includes(k))wtUnion.push(k)}));
@@ -490,7 +491,7 @@ function ExportModal({records,onClose,companies}){
             <button id="tblCopyBtn" onClick={()=>{
               const wkCat=mode==="weekly";
               const cols=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"];
-              if(wkCat)cols.push("Work Category 作業類別");
+              if(wkCat)cols.push("90 Days Verification 90天驗證計畫");
               const hdr="<tr>"+cols.map(h=>"<th>"+h+"</th>").join("")+"</tr>";
               const cells=(r)=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.processIsolation||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""]};
               const body=filtered.map(r=>{const a=cells(r);if(wkCat)a.push(wtLines(r.workTypes).join("<br>"));return"<tr><td>"+a.join("</td><td>")+"</td></tr>"}).join("");
@@ -518,7 +519,7 @@ function ExportModal({records,onClose,companies}){
           <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"#1a2744"}}>
-              {["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"].concat(mode==="weekly"?["Work Category 作業類別"]:[]).map(h=>
+              {["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"].concat(mode==="weekly"?["90 Days Verification 90天驗證計畫"]:[]).map(h=>
                 <th key={h} style={{padding:"8px 5px",fontSize:10,fontWeight:700,color:"#94a3b8",textAlign:"left",borderBottom:"2px solid #253552",whiteSpace:"nowrap"}}>{h}</th>
               )}
             </tr></thead>
@@ -641,7 +642,7 @@ function SummaryPrintView({data,records}){
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>window.history.length>1?window.location.reload():window.location.reload()} style={{padding:"8px 20px",borderRadius:8,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:12}}>← 返回</button>
             <button onClick={()=>{
-              const hdr="<tr><th>包商名稱</th><th>工作地點</th><th>預計工作內容</th><th>許可號碼</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th><th>作業類別<br><span style='font-size:9px;font-weight:400'>Work Category</span></th></tr>";
+              const hdr="<tr><th>包商名稱</th><th>工作地點</th><th>預計工作內容</th><th>許可號碼</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th><th>90 天驗證計畫<br><span style='font-size:9px;font-weight:400'>90 Days Verification</span></th></tr>";
               let body="";
               rows.forEach(co=>{co.items.forEach((item,ii)=>{
                 body+="<tr>";
@@ -677,7 +678,7 @@ function SummaryPrintView({data,records}){
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>許可號碼</th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"11%"}}>許可到期日<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>🟡即將過期 🔴已過期</div></th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"12%"}}>未關數量(號碼)</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"18%"}}>作業類別<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>Work Category</div></th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"18%"}}>90 天驗證計畫<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>90 Days Verification</div></th>
               <th style={{padding:"10px 6px",border:"1px solid #253552",fontWeight:700,width:"5%"}} className="no-print">操作</th>
             </tr></thead>
             <tbody>
@@ -719,7 +720,7 @@ function SummaryPrintView({data,records}){
           <th style={{width:"7%"}}>許可號碼</th>
           <th style={{width:"12%"}}>許可到期日<div style={{fontSize:8,fontWeight:400,marginTop:2}}>🟡即將過期 🔴已過期</div></th>
           <th style={{width:"12%"}}>未關數量(號碼)</th>
-          <th style={{width:"22%"}}>作業類別<div style={{fontSize:8,fontWeight:400,marginTop:2}}>Work Category</div></th>
+          <th style={{width:"22%"}}>90 天驗證計畫<div style={{fontSize:8,fontWeight:400,marginTop:2}}>90 Days Verification</div></th>
         </tr></thead>
         <tbody>
           {rows.map((co,ci)=>co.items.map((item,ii)=>(
@@ -1322,7 +1323,7 @@ function App(){
               );
             })}
           </div>
-          <Sec icon="⚠️" zh="作業類別" en="Work Categories (可多選 / multi-select)" color="#fbbf24"/>
+          <Sec icon="⚠️" zh="90 天驗證計畫" en="90 Days Verification (可多選 / multi-select)" color="#fbbf24"/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10,marginBottom:12}}>
             {WORK_TYPES.map((wt,i)=>{
               const on=wtKeys(form.workTypes).includes(wt.key);
@@ -1897,7 +1898,7 @@ function PreviewView({form,setView,activeCerts,c}){
         {activeCerts.length>0&&<div><div style={{fontSize:11,fontWeight:700,color:c.dim,marginBottom:8}}>📜 額外證書</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{activeCerts.map(x=><div key={x.key} style={{background:"#34d39915",border:"1px solid #34d39933",borderRadius:6,padding:"6px 12px",fontSize:12}}><span style={{color:c.dim,fontSize:10}}>{x.zh}</span><div style={{fontWeight:700,color:"#34d399",marginTop:1}}>{form[x.key]}</div></div>)}</div>
         </div>}
-        {wtItems(form.workTypes).length>0&&<div style={{marginTop:16}}><div style={{fontSize:11,fontWeight:700,color:c.dim,marginBottom:8}}>⚠️ 作業類別 Work Categories</div>
+        {wtItems(form.workTypes).length>0&&<div style={{marginTop:16}}><div style={{fontSize:11,fontWeight:700,color:c.dim,marginBottom:8}}>⚠️ 90 天驗證計畫 90 Days Verification</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{wtItems(form.workTypes).map(w=><div key={w.key} style={{background:"#fbbf2415",border:"1px solid #fbbf2433",borderRadius:6,padding:"6px 12px",fontSize:12}}><div style={{fontWeight:700,color:"#fbbf24"}}>{w.zh}</div><div style={{color:c.dim,fontSize:10,marginTop:1}}>{w.en}</div></div>)}</div>
         </div>}
       </div>
