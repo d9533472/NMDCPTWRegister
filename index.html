@@ -44,9 +44,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:po
 @media(max-width:768px){
   /* Hide less critical table columns on mobile: 開始日, 申請人, 持有人, 證書 */
   .tbl-hide-m{display:none!important}
-  .ptw-table-wrap table{min-width:750px!important;table-layout:auto!important}
+  .ptw-table-wrap table{min-width:880px!important;table-layout:auto!important}
   .ptw-table-wrap colgroup{display:none!important}
-  .tbl-scroll-spacer{width:750px!important}
+  .tbl-scroll-spacer{width:880px!important}
   /* --- Header: stack vertically, compact --- */
   .ptw-header{flex-direction:column!important;padding:8px 10px!important;gap:6px!important;align-items:stretch!important}
   .ptw-header .ptw-logo-area{width:100%!important;gap:8px!important}
@@ -986,6 +986,7 @@ function App(){
   const [fDesc,setFDesc]=useState("");
   const [fStatus,setFStatus]=useState("");
   const [fCert,setFCert]=useState("");
+  const [fWT,setFWT]=useState("");
   const [showColFilters,setShowColFilters]=useState(false);
   const [page,setPage]=useState(0);
   const [showExport,setShowExport]=useState(false);
@@ -1206,11 +1207,12 @@ function App(){
     if(fDesc){const s=fDesc.toLowerCase();r=r.filter(x=>(x.workDescription||"").toLowerCase().includes(s))}
     if(fStatus){r=r.filter(x=>{const fc=fmtClose(x.closingDate,x.validDate);if(fStatus==="active")return fc.text==="執行中";if(fStatus==="overdue")return fc.text==="逾期未關";if(fStatus==="closed")return fc.isClosed;return true})}
     if(fCert){r=r.filter(x=>{const cat=CATS.find(c=>c.zh===fCert);return cat&&x[cat.key]&&x[cat.key].trim()})}
+    if(fWT){r=r.filter(x=>wtKeys(x.workTypes).includes(fWT))}
     if(search){const s=search.toLowerCase();r=r.filter(x=>[x.ptwNumber,x.applicant,x.holder,x.workDescription,x.location,x.ehs,x.supervisor].some(v=>(v||"").toLowerCase().includes(s)))}
     if(tblWeekOn){const pS2=s=>{const p=s.split("-").map(Number);return new Date(p[0],p[1]-1,p[2])};const ws=pS2(tblWkS);ws.setHours(0,0,0,0);const we=pS2(tblWkE);we.setHours(23,59,59,999);r=r.filter(x=>{if(!x.issuingDate)return false;const d=pS2(x.issuingDate);return d>=ws&&d<=we})}
     r=[...r].sort((a,b)=>ptwNum(b.ptwNumber)-ptwNum(a.ptwNumber));
     return r;
-  },[records,filterCo,fPtw,fApplicant,fHolder,fLoc,fDesc,fStatus,fCert,search,tblWeekOn,tblWkS,tblWkE]);
+  },[records,filterCo,fPtw,fApplicant,fHolder,fLoc,fDesc,fStatus,fCert,fWT,search,tblWeekOn,tblWkS,tblWkE]);
 
   const totalPages=Math.ceil(filtered.length/PER);
   const pageData=filtered.slice(page*PER,(page+1)*PER);
@@ -1358,8 +1360,8 @@ function App(){
               <h2 style={{fontSize:18,fontWeight:800,margin:0}}>📋 紀錄列表 ({filtered.length}/{records.length}){tblWeekOn&&<span style={{fontSize:12,fontWeight:400,color:c.dim,marginLeft:8}}>{(()=>{const s=new Date(tblWkS.replace(/-/g,"/"));const e=new Date(tblWkE.replace(/-/g,"/"));const fR2=d=>d.toLocaleDateString("zh-TW",{month:"2-digit",day:"2-digit"});return fR2(s)+"("+tblDayNames[s.getDay()]+") ~ "+fR2(e)+"("+tblDayNames[e.getDay()]+")"})()}</span>}</h2>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                 <input value={search} onChange={e=>{setSearch(e.target.value);setPage(0)}} placeholder="🔍 搜尋..." style={{...iS,width:160,padding:"7px 12px",fontSize:12}}/>
-                <button onClick={()=>{setShowColFilters(!showColFilters);setPage(0)}} style={{padding:"7px 14px",borderRadius:8,border:"1px solid "+(showColFilters?c.accent+"88":c.border),background:showColFilters?c.accent+"18":"transparent",color:showColFilters?c.accent:c.dim,cursor:"pointer",fontSize:12,fontWeight:showColFilters?700:500}}>🔽 {showColFilters?"欄位篩選 ON":"欄位篩選"}{(()=>{const n=[fPtw,filterCo,fApplicant,fHolder,fLoc,fDesc,fStatus,fCert].filter(Boolean).length;return n>0?<span style={{marginLeft:4,padding:"1px 6px",borderRadius:10,background:c.accent,color:"#0c1220",fontSize:9,fontWeight:800}}>{n}</span>:null})()}</button>
-                {showColFilters&&(fPtw||filterCo||fApplicant||fHolder||fLoc||fDesc||fStatus||fCert)&&<button onClick={()=>{setFPtw("");setFilterCo("");setFApplicant("");setFHolder("");setFLoc("");setFDesc("");setFStatus("");setFCert("");setPage(0)}} style={{padding:"7px 12px",borderRadius:8,border:"1px solid "+c.danger+"44",background:c.danger+"11",color:c.danger,cursor:"pointer",fontSize:11,fontWeight:600}}>✕ 清除篩選</button>}
+                <button onClick={()=>{setShowColFilters(!showColFilters);setPage(0)}} style={{padding:"7px 14px",borderRadius:8,border:"1px solid "+(showColFilters?c.accent+"88":c.border),background:showColFilters?c.accent+"18":"transparent",color:showColFilters?c.accent:c.dim,cursor:"pointer",fontSize:12,fontWeight:showColFilters?700:500}}>🔽 {showColFilters?"欄位篩選 ON":"欄位篩選"}{(()=>{const n=[fPtw,filterCo,fApplicant,fHolder,fLoc,fDesc,fStatus,fCert,fWT].filter(Boolean).length;return n>0?<span style={{marginLeft:4,padding:"1px 6px",borderRadius:10,background:c.accent,color:"#0c1220",fontSize:9,fontWeight:800}}>{n}</span>:null})()}</button>
+                {showColFilters&&(fPtw||filterCo||fApplicant||fHolder||fLoc||fDesc||fStatus||fCert||fWT)&&<button onClick={()=>{setFPtw("");setFilterCo("");setFApplicant("");setFHolder("");setFLoc("");setFDesc("");setFStatus("");setFCert("");setFWT("");setPage(0)}} style={{padding:"7px 12px",borderRadius:8,border:"1px solid "+c.danger+"44",background:c.danger+"11",color:c.danger,cursor:"pointer",fontSize:11,fontWeight:600}}>✕ 清除篩選</button>}
                 <button onClick={()=>setShowExport(true)} style={{padding:"8px 18px",borderRadius:8,border:"1px solid #34d39944",background:"#34d39915",color:"#34d399",cursor:"pointer",fontSize:12,fontWeight:700}}>🖨 輸出</button>
                 {isAuth&&<button onClick={()=>{setForm({...empty,ptwNumber:getNextPTW(records)});setEditIdx(null);setView("form")}} style={{padding:"8px 20px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#38bdf8,#6366f1)",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>+ 新增</button>}
               </div>
@@ -1395,10 +1397,11 @@ function App(){
                 <col style={{width:80}}/>
                 <col/>
                 <col style={{width:62}}/>
+                <col style={{width:110}}/>
                 <col style={{width:78}}/>
               </colgroup>
               <thead><tr>
-                {["#","PTW","延續","公司","發證日","開始日","到期日","關閉日","申請人","持有人","區域","工作描述","證書","操作"].map((h,hi)=>
+                {["#","PTW","延續","公司","發證日","開始日","到期日","關閉日","申請人","持有人","區域","工作描述","證書","90天驗證","操作"].map((h,hi)=>
                   <th key={h} className={[5,8,9].includes(hi)?"tbl-hide-m":""} style={{padding:"8px 5px",fontSize:10,fontWeight:700,color:c.dim,textAlign:"left",borderBottom:"1px solid "+c.border,whiteSpace:"nowrap"}}>{h}</th>
                 )}
               </tr>{showColFilters&&<tr style={{background:c.input}}>
@@ -1416,6 +1419,7 @@ function App(){
                 <th style={{padding:"3px 2px"}}><input value={fLoc} onChange={e=>{setFLoc(e.target.value);setPage(0)}} placeholder="區域" style={fs}/></th>
                 <th style={{padding:"3px 2px"}}><input value={fDesc} onChange={e=>{setFDesc(e.target.value);setPage(0)}} placeholder="描述" style={fs}/></th>
                 <th style={{padding:"3px 2px"}}><select value={fCert} onChange={e=>{setFCert(e.target.value);setPage(0)}} style={{...fs,padding:"3px 1px"}}><option value="">全部</option>{CATS.map(x=><option key={x.key} value={x.zh}>{x.zh}</option>)}</select></th>
+                <th style={{padding:"3px 2px"}}><select value={fWT} onChange={e=>{setFWT(e.target.value);setPage(0)}} style={{...fs,padding:"3px 1px"}}><option value="">全部</option>{WORK_TYPES.map((x,xi)=><option key={x.key} value={x.key}>{String(xi+1).padStart(2,"0")+". "+x.zs}</option>)}</select></th>
                 <th style={{padding:"3px 2px"}}></th>
                 </>})()}
               </tr>}</thead>
@@ -1439,6 +1443,7 @@ function App(){
                     <td style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{(r.location||"")}</td>
                     <td style={{...tdS,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{r.workDescription||"—"}{r.holder&&<span className="tbl-holder-sub" style={{display:"none",fontSize:9,color:c.dim,marginTop:3}}>👤 {r.holder}</span>}</td>
                     <td style={tdS}><div style={{display:"flex",gap:2,flexWrap:"wrap"}}>{certs.length?certs.map((x,j)=><span key={j} style={{fontSize:8,background:"#34d39918",color:"#34d399",padding:"1px 4px",borderRadius:3,whiteSpace:"nowrap"}}>{x}</span>):<span style={{color:c.dim,fontSize:9}}>—</span>}</div></td>
+                    <td style={tdS}><div style={{display:"flex",gap:2,flexWrap:"wrap"}}>{(()=>{const ws=wtItems(r.workTypes);return ws.length?ws.map(w=><span key={w.key} title={w.zh+" "+w.en} style={{fontSize:8,background:"#fbbf2418",color:"#fbbf24",padding:"1px 4px",borderRadius:3,whiteSpace:"nowrap"}}>{wtNo(w)+". "+w.zs}</span>):<span style={{color:c.dim,fontSize:9}}>—</span>})()}</div></td>
                     <td style={tdS}><div style={{display:"flex",gap:3,flexWrap:"nowrap"}}>
                       {isAuth&&<button onClick={()=>{setForm({...r});setEditIdx(records.findIndex(x=>x.ptwNumber===r.ptwNumber));setView("form")}} style={ab(c.accent)} title="編輯">✏️</button>}
                       {isAuth&&<button onClick={()=>{setForm({...r});setView("preview")}} style={ab("#a78bfa")} title="預覽">👁</button>}
