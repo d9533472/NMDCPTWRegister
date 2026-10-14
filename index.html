@@ -222,7 +222,7 @@ function exportTablePDF(filtered,mode,subtitle,fmtD){
   else{alert("請允許彈出視窗 (pop-up) 以輸出列印頁面")}
 }
 
-function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
+function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD,wkLabel){
   let html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>PTW Weekly Summary</title><style>
     @page{size:A4 landscape;margin:10mm}
     *{margin:0;padding:0;box-sizing:border-box}
@@ -239,8 +239,8 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head><body>
   <h2>PTW Weekly Status Update</h2>
-  <div class="sub">Generated: ${new Date().toLocaleDateString()}</div>
-  <table><thead><tr><th style="width:10%">Company</th><th style="width:15%">Location</th><th style="width:26%">Description</th><th style="width:7%">PTW No.</th><th style="width:11%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:12%">Unclosed</th><th style="width:19%">90 Days Verification<br><span style="font-size:7px;font-weight:400">90 天驗證計畫</span></th></tr></thead><tbody>`;
+  <div class="sub">${wkLabel?"Week "+wkLabel+" | ":""}Generated: ${new Date().toLocaleDateString()}</div>
+  <table><thead><tr><th style="width:10%">Company</th><th style="width:7%">PTW No.</th><th style="width:15%">Location</th><th style="width:26%">Description</th><th style="width:11%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:12%">Unclosed</th><th style="width:19%">90 Days Verification<br><span style="font-size:7px;font-weight:400">90 天驗證計畫</span></th></tr></thead><tbody>`;
   rows.forEach(co=>{
     const uc=getUnclosed(co.company);
     co.items.forEach((item,ii)=>{
@@ -249,9 +249,9 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
       const vd=item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-";
       html+="<tr>"
         +"<td>"+(ii===0?co.company:"")+"</td>"
+        +'<td class="'+cls+'" style="text-align:center;font-weight:700">'+(item.ptwNo||"")+"</td>"
         +"<td>"+item.loc+"</td>"
         +'<td class="'+cls+'">'+(item.noWork?"暫無工作":item.desc)+"</td>"
-        +'<td class="'+cls+'">'+(item.ptwNo||"")+"</td>"
         +'<td class="'+cls+'">'+vd+"</td>"
         +"<td>"+(ii===0?uc:"")+"</td>"
         +'<td style="white-space:pre-line">'+(item.wt||"")+"</td>"
@@ -291,14 +291,33 @@ function Fld({label,req,children}){return <div><label style={{display:"block",fo
 /* ============================================================ */
 /*  WEEKLY SUMMARY GENERATOR                                     */
 /* ============================================================ */
-function generateWeeklySummary(records,companies){
+/* 報表週＝週六～週五。平日/週五 → 今天所在的那一週；
+   週六 → 沿用剛結束的那一週（習慣在週五、週六抓同一份表） */
+function reportWeek(base){
+  const d=base?new Date(base):new Date();
+  d.setHours(0,0,0,0);
+  const dow=d.getDay();                     // 0=日 … 6=六
+  const off=dow===6?-7:-(dow+1);            // 週六往前退一整週
+  const s=new Date(d);s.setDate(d.getDate()+off);s.setHours(0,0,0,0);
+  const e=new Date(s);e.setDate(s.getDate()+6);e.setHours(23,59,59,999);
+  return{s,e};
+}
+const dOnly=(v)=>{if(!v)return null;const pp=String(v).replace(/\//g,"-").split("-").map(Number);if(pp.length<3||isNaN(pp[0]))return null;const d=new Date(pp[0],pp[1]-1,pp[2]);d.setHours(0,0,0,0);return d};
+/* 這筆 PTW 的效期是否與本週有交集 */
+function inWeek(r,wkS,wkE){
+  const st=dOnly(r.startDate)||dOnly(r.issuingDate);
+  const vd=dOnly(r.validDate)||st;
+  if(!st&&!vd)return false;
+  const a=st||vd, b=vd||st;
+  return a<=wkE&&b>=wkS;
+}
+
+function generateWeeklySummary(records,companies,wkS,wkE){
   const today=new Date();
   const coGroups={};
-  
-  // known main locations per logic
-  const mainLocs=["台中工區","通霄工區","管線暫置區","通霄電廠","28號碼頭","天力儲區","37號碼頭","44/45碼頭","103號碼頭","船邊作業碼頭","台中港106碼頭"];
-  
-  records.forEach(r=>{
+  const inRange=(wkS&&wkE)?records.filter(r=>inWeek(r,wkS,wkE)):records;
+
+  inRange.forEach(r=>{
     const co=r.applyCompany;
     if(!coGroups[co])coGroups[co]={records:[],locs:{}};
     coGroups[co].records.push(r);
@@ -318,9 +337,9 @@ function generateWeeklySummary(records,companies){
     const locEntries=Object.entries(g.locs);
     // sort locations by most recent PTW
     locEntries.sort((a,b)=>{
-      const maxA=Math.max(...a[1].map(r=>ptwNum(r.ptwNumber)));
-      const maxB=Math.max(...b[1].map(r=>ptwNum(r.ptwNumber)));
-      return maxB-maxA;
+      const maxA=Math.min(...a[1].map(r=>ptwNum(r.ptwNumber)));
+      const maxB=Math.min(...b[1].map(r=>ptwNum(r.ptwNumber)));
+      return maxA-maxB;
     });
     
     // unclosed for this company (only expired ones)
@@ -334,38 +353,23 @@ function generateWeeklySummary(records,companies){
     
     const coRows=[];
     locEntries.forEach(([loc,recs])=>{
-      // get latest PTW by number
-      const sorted=[...recs].sort((a,b)=>ptwNum(b.ptwNumber)-ptwNum(a.ptwNumber));
-      const latest=sorted[0];
-      const isClosed=latest.closingDate&&latest.closingDate.trim()!=="";
-      const isExpired=latest.validDate&&new Date(latest.validDate)<today;
-      
-      // Check if this location has any open/active PTW
-      const hasActive=recs.some(r=>(!r.closingDate||r.closingDate.trim()===""));
-      
-      if(isClosed&&!hasActive){
+      /* 本週該地點的每一筆 PTW 都列出來，依許可號碼由小到大 */
+      const sorted=[...recs].sort((a,b)=>ptwNum(a.ptwNumber)-ptwNum(b.ptwNumber));
+      sorted.forEach(show=>{
+        const desc=(show.workDescription||"").replace(/\n/g,"、").trim();
         /* 暫無工作 → 直接不列入輸出 */
-        return;
-      }else{
-        // show most recent active, or latest if still valid
-        const activeRecs=sorted.filter(r=>!r.closingDate||r.closingDate.trim()==="");
-        const show=activeRecs.length?activeRecs[0]:latest;
-        /* 同地點所有仍在執行的 PTW 之 90 天驗證計畫項目聯集 */
-        const wtSrc=activeRecs.length?activeRecs:[latest];
-        const wtUnion=[];
-        wtSrc.forEach(r=>wtKeys(r.workTypes).forEach(k=>{if(!wtUnion.includes(k))wtUnion.push(k)}));
-        wtUnion.sort((a,b)=>WORK_TYPES.findIndex(w=>w.key===a)-WORK_TYPES.findIndex(w=>w.key===b));
+        if(!desc||/暫無工作|無工作|no work/i.test(desc))return;
         coRows.push({
           loc,
-          desc:(show.workDescription||"").replace(/\n/g,"、"),
+          desc,
           ptwNo:String(ptwNum(show.ptwNumber)),
           validDate:show.validDate||"-",
-          wt:wtText(wtUnion.join(",")),
+          wt:wtText(show.workTypes),
           noWork:false,
           expired:show.validDate&&new Date(show.validDate)<today,
           expiringSoon:show.validDate&&(()=>{const v=new Date(show.validDate);const diff=(v-today)/(1000*60*60*24);return diff>=0&&diff<=3})()
         });
-      }
+      });
     });
     
     /* 整間公司都暫無工作 → 整列不輸出 */
@@ -393,10 +397,14 @@ function ExportModal({records,onClose,companies}){
   const printRef=useRef(null);
 
   const today=new Date();
-  const dow=today.getDay();
-  const satOff=dow>=6?0:-(dow+1);
-  const wkS=new Date(today);wkS.setDate(today.getDate()+satOff);wkS.setHours(0,0,0,0);
-  const wkE=new Date(wkS);wkE.setDate(wkS.getDate()+6);wkE.setHours(23,59,59,999);
+  /* 每周摘要的報表週（週六～週五），可用 ◀▶ 前後切換 */
+  const [wkShift,setWkShift]=useState(0);
+  const {s:wkS,e:wkE}=(()=>{
+    const base=new Date();base.setDate(base.getDate()+wkShift*7);
+    return reportWeek(base);
+  })();
+  const fmtWk=(d)=>(d.getMonth()+1)+"/"+d.getDate();
+  const wkLabel=fmtWk(wkS)+"(六) ~ "+fmtWk(wkE)+"(五)";
 
   const getFiltered=()=>{
     let r=[...records];
@@ -423,7 +431,7 @@ function ExportModal({records,onClose,companies}){
 
   const handleExport=()=>{
     if(mode==="summary"){
-      setSummaryData(generateWeeklySummary(records,companies));
+      setSummaryData(generateWeeklySummary(records,companies,wkS,wkE));
     } else {
       setSummaryData(null);
       setShowTablePreview(true);
@@ -464,12 +472,18 @@ function ExportModal({records,onClose,companies}){
             <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...iS,width:160,padding:"7px 10px",fontSize:12}}/>
           </div>}
           {rOpt("weekly","📊 週報格式","Unclosed + still valid PTWs ("+records.filter(x=>{const d=(x.workDescription||"").trim();if(!d||/暫無工作|無工作|no work/i.test(d))return false;return(!x.closingDate||x.closingDate.trim()==="")||(x.validDate&&new Date(x.validDate)>=today)}).length+" records，不含暫無工作)")}
-          {rOpt("summary","📝 每周摘要","PTW 周狀態更新 — by company & location")}
+          {rOpt("summary","📝 每周摘要","PTW 周狀態更新 — 本週每一筆許可，依公司與地點")}
+          {mode==="summary"&&<div style={{marginLeft:40,marginTop:-4,marginBottom:4,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+            <button onClick={()=>setWkShift(wkShift-1)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:11}}>◀ 上週</button>
+            <span style={{fontSize:12,fontWeight:700,color:"#38bdf8",fontFamily:"'JetBrains Mono',monospace"}}>{wkLabel}</span>
+            <button onClick={()=>setWkShift(wkShift+1)} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:11}}>下週 ▶</button>
+            {wkShift!==0&&<button onClick={()=>setWkShift(0)} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#38bdf822",color:"#38bdf8",cursor:"pointer",fontSize:11,fontWeight:700}}>本週</button>}
+          </div>}
         </div>
 
         <div style={{background:"#0f1a2e",borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:12,color:"#94a3b8"}}>
           {mode==="summary"?
-            <span>將產生各公司×工作地點的最新 PTW 狀態摘要，所有欄位皆可在輸出前編輯。</span>:
+            <span>報表週 <strong style={{color:"#38bdf8"}}>{wkLabel}</strong>（週六～週五）— 該區間內每一筆 PTW 都會列出，所有欄位皆可在輸出前編輯。</span>:
             <span>篩選結果: <strong style={{color:"#38bdf8"}}>{filtered.length}</strong> 筆紀錄 — 橫式 A3 格式，自動換行</span>
           }
         </div>
@@ -560,14 +574,14 @@ function ExportModal({records,onClose,companies}){
 
     {/* ===== PRINT CSS VIEW (for window.print) ===== */}
 
-    {mode==="summary"&&summaryData&&<SummaryPrintView data={summaryData} records={records}/>}
+    {mode==="summary"&&summaryData&&<SummaryPrintView data={summaryData} records={records} wkLabel={wkLabel}/>}
   </>);
 }
 
 /* ============================================================ */
 /*  SUMMARY PRINT VIEW (editable before print)                   */
 /* ============================================================ */
-function SummaryPrintView({data,records}){
+function SummaryPrintView({data,records,wkLabel}){
   const [rows,setRows]=useState(data);
   const today=new Date();
   const todayStr=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
@@ -642,14 +656,14 @@ function SummaryPrintView({data,records}){
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>window.history.length>1?window.location.reload():window.location.reload()} style={{padding:"8px 20px",borderRadius:8,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:12}}>← 返回</button>
             <button onClick={()=>{
-              const hdr="<tr><th>包商名稱</th><th>工作地點</th><th>預計工作內容</th><th>許可號碼</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th><th>90 天驗證計畫<br><span style='font-size:9px;font-weight:400'>90 Days Verification</span></th></tr>";
+              const hdr="<tr><th>包商名稱</th><th>許可號碼</th><th>工作地點</th><th>預計工作內容</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th><th>90 天驗證計畫<br><span style='font-size:9px;font-weight:400'>90 Days Verification</span></th></tr>";
               let body="";
               rows.forEach(co=>{co.items.forEach((item,ii)=>{
                 body+="<tr>";
                 if(ii===0)body+="<td rowspan='"+co.items.length+"'>"+co.company+"</td>";
+                body+="<td style='text-align:center;font-weight:bold'>"+item.ptwNo+"</td>";
                 body+="<td>"+item.loc+"</td>";
                 body+="<td>"+(item.noWork?"暫無工作":item.desc)+"</td>";
-                body+="<td style='text-align:center'>"+item.ptwNo+"</td>";
                 const dc=getDateColor(item.validDate);
                 const vdDisplay=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";
                 body+="<td style='text-align:center"+(dc.isRed?";background:#ff4444;color:#fff":dc.isSoon?";background:#fbbf24;color:#422006":";color:#22c55e")+";font-weight:bold'>"+vdDisplay+"</td>";
@@ -659,23 +673,23 @@ function SummaryPrintView({data,records}){
               })});
               const html="<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;font-family:sans-serif;font-size:12px'><thead style='background:#e8e8e8;font-weight:bold'>"+hdr+"</thead><tbody>"+body+"</tbody></table>";
               const blob=new Blob([html],{type:"text/html"});
-              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";return[ii===0?co.company:"",item.loc,item.noWork?"暫無工作":item.desc,item.ptwNo,vd,ii===0?getUnclosed(co.company):"",(item.wt||"").replace(/\n/g,"; ")].join("\t")}).join("\n")).join("\n");
+              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";return[ii===0?co.company:"",item.ptwNo,item.loc,item.noWork?"暫無工作":item.desc,vd,ii===0?getUnclosed(co.company):"",(item.wt||"").replace(/\n/g,"; ")].join("\t")}).join("\n")).join("\n");
               navigator.clipboard.write([new ClipboardItem({"text/html":blob,"text/plain":new Blob([text],{type:"text/plain"})})]).then(()=>{const btn=document.getElementById("copyOk");if(btn){btn.textContent="✅ 已複製!";setTimeout(()=>btn.textContent="📋 複製表格",1500)}})
             }} id="copyOk" style={{padding:"8px 20px",borderRadius:8,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontSize:12,fontWeight:700}}>📋 複製表格</button>
-            <button onClick={()=>{exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD)}} style={{padding:"8px 24px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#34d399,#38bdf8)",color:"#0c1220",cursor:"pointer",fontSize:13,fontWeight:800}}>🖨 輸出PDF</button>
+            <button onClick={()=>{exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD,wkLabel)}} style={{padding:"8px 24px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#34d399,#38bdf8)",color:"#0c1220",cursor:"pointer",fontSize:13,fontWeight:800}}>🖨 輸出PDF</button>
           </div>
         </div>
         
         <div style={{background:"#141e30",borderRadius:14,border:"1px solid #253552",overflow:"hidden"}}>
           <div style={{textAlign:"center",padding:"16px",borderBottom:"1px solid #253552"}}>
-            <div style={{fontSize:20,fontWeight:900}}>PTW 周狀態更新 {fmtD(new Date().toISOString().slice(0,10))}</div>
+            <div style={{fontSize:20,fontWeight:900}}>PTW 周狀態更新 {fmtD(new Date().toISOString().slice(0,10))}</div>{wkLabel&&<div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>報表週 {wkLabel}</div>}
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{background:"#1a2744"}}>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>包商名稱</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>許可號碼</th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"10%"}}>工作地點</th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"30%"}}>預計工作內容</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>許可號碼</th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"11%"}}>許可到期日<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>🟡即將過期 🔴已過期</div></th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"12%"}}>未關數量(號碼)</th>
               <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"18%"}}>90 天驗證計畫<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>90 Days Verification</div></th>
@@ -685,9 +699,9 @@ function SummaryPrintView({data,records}){
               {rows.map((co,ci)=>co.items.map((item,ii)=>(
                 <tr key={co.company+"-"+ii} style={{background:ii%2===0?"transparent":"#0f1a2e11"}}>
                   {ii===0&&<td rowSpan={co.items.length} style={{padding:"8px 10px",border:"1px solid #253552",fontWeight:700,verticalAlign:"top",background:"#1a274433"}} contentEditable suppressContentEditableWarning onBlur={e=>updateCo(ci,"company",e.target.textContent)}>{co.company}</td>}
+                  <td style={{padding:"6px 8px",border:"1px solid #253552",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:"#38bdf8"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"ptwNo",e.target.textContent)}>{item.ptwNo}</td>
                   <td style={{padding:"6px 8px",border:"1px solid #253552"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"loc",e.target.textContent)}>{item.loc}</td>
                   <td style={{padding:"6px 8px",border:"1px solid #253552",color:item.noWork?"#94a3b8":"#e2e8f0",fontStyle:item.noWork?"italic":"normal",textAlign:item.noWork?"center":"left"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"desc",e.target.textContent)}>{item.desc}</td>
-                  <td style={{padding:"6px 8px",border:"1px solid #253552",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:"#38bdf8"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"ptwNo",e.target.textContent)}>{item.ptwNo}</td>
                   <td style={{padding:"4px 6px",border:"1px solid #253552",textAlign:"center",fontWeight:700,background:getDateColor(item.validDate).bg,color:getDateColor(item.validDate).fg}}><input type="date" value={(item.validDate&&item.validDate!=="-")?item.validDate.replace(/\//g,"-"):""} onChange={e=>updateDateCell(ci,ii,e.target.value)} style={{background:"transparent",border:"none",color:"inherit",fontWeight:700,fontSize:12,textAlign:"center",width:"100%",cursor:"pointer"}}/></td>
                   {ii===0&&<td rowSpan={co.items.length} style={{padding:"8px 10px",border:"1px solid #253552",textAlign:"center",verticalAlign:"top",fontWeight:700,fontSize:12}}>{getUnclosed(co.company)}</td>}
                   <td style={{padding:"6px 8px",border:"1px solid #253552",fontSize:11,whiteSpace:"pre-line",lineHeight:1.45,color:"#fbbf24"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"wt",e.target.innerText)}>{item.wt||""}</td>
@@ -711,13 +725,13 @@ function SummaryPrintView({data,records}){
 
     {/* Actual print view */}
     <div className="print-view" style={{display:"none"}}>
-      <div className="print-title">PTW 周狀態更新 {fmtD(new Date().toISOString().slice(0,10))}</div>
+      <div className="print-title">PTW 周狀態更新 {fmtD(new Date().toISOString().slice(0,10))}{wkLabel?"（"+wkLabel+"）":""}</div>
       <table className="summary-table">
         <thead><tr>
           <th style={{width:"7%"}}>包商名稱</th>
+          <th style={{width:"7%"}}>許可號碼</th>
           <th style={{width:"10%"}}>工作地點</th>
           <th style={{width:"30%"}}>預計工作內容</th>
-          <th style={{width:"7%"}}>許可號碼</th>
           <th style={{width:"12%"}}>許可到期日<div style={{fontSize:8,fontWeight:400,marginTop:2}}>🟡即將過期 🔴已過期</div></th>
           <th style={{width:"12%"}}>未關數量(號碼)</th>
           <th style={{width:"22%"}}>90 天驗證計畫<div style={{fontSize:8,fontWeight:400,marginTop:2}}>90 Days Verification</div></th>
@@ -726,9 +740,9 @@ function SummaryPrintView({data,records}){
           {rows.map((co,ci)=>co.items.map((item,ii)=>(
             <tr key={co.company+"-p-"+ii}>
               {ii===0&&<td rowSpan={co.items.length} style={{fontWeight:700,verticalAlign:"top"}}>{co.company}</td>}
+              <td style={{textAlign:"center",fontWeight:700}}>{item.ptwNo}</td>
               <td>{item.loc}</td>
               <td className={item.noWork?"no-work":""}>{item.desc}</td>
-              <td style={{textAlign:"center",fontWeight:700}}>{item.ptwNo}</td>
               <td style={{textAlign:"center",fontWeight:700}} className={getDateColor(item.validDate).isRed?"expired-date":getDateColor(item.validDate).isSoon?"soon-date":(item.validDate&&item.validDate!=="-"?"green-date":"")}>{item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-"}</td>
               {ii===0&&<td rowSpan={co.items.length} style={{textAlign:"center",fontWeight:700,verticalAlign:"top"}}>{getUnclosed(co.company)}</td>}
               <td style={{whiteSpace:"pre-line",lineHeight:1.4}}>{item.wt||""}</td>
