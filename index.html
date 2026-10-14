@@ -34,6 +34,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:po
   .print-view .expired-date{background:#ff4444!important;color:#fff!important;font-weight:700!important}
   .print-view .soon-date{background:#fbbf24!important;color:#422006!important;font-weight:700!important}
   .print-view .green-date{color:#16a34a!important;font-weight:700!important}
+  .print-view .closed-date{background:#eef1f5!important;color:#64748b!important;font-weight:700!important}
   .print-view .no-work{text-align:center;color:#888!important;font-style:italic}
   .print-view .print-title{text-align:center;font-size:18px;font-weight:900;margin-bottom:6px;color:#000}
   .print-view .print-sub{text-align:center;font-size:11px;margin-bottom:12px;color:#555}
@@ -236,6 +237,7 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD,wkLabel){
     .bg-soon{background:#fef9c3;color:#a16207;font-weight:700}
     .bg-green{background:#dcfce7;color:#16a34a}
     .bg-gray{background:#f1f5f9;color:#94a3b8;font-style:italic}
+    .bg-closed{background:#eef1f5;color:#64748b}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head><body>
   <h2>PTW Weekly Status Update</h2>
@@ -244,9 +246,10 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD,wkLabel){
   rows.forEach(co=>{
     const uc=getUnclosed(co.company);
     co.items.forEach((item,ii)=>{
-      const dc=getDateColor(item.validDate);
-      const cls=item.noWork?"bg-gray":dc.isRed?"bg-red":dc.isSoon?"bg-soon":(!item.noWork&&item.validDate&&item.validDate!=="-")?"bg-green":"";
-      const vd=item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-";
+      const dc=getDateColor(item.validDate,item.closing);
+      const cls=item.noWork?"bg-gray":dc.isClosed?"bg-closed":dc.isRed?"bg-red":dc.isSoon?"bg-soon":(!item.noWork&&item.validDate&&item.validDate!=="-")?"bg-green":"";
+      const vd=(item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-")
+        +(dc.isClosed?'<br><span style="font-size:7px;font-weight:400">已關 '+fmtD(item.closing)+"</span>":"");
       html+="<tr>"
         +"<td>"+(ii===0?co.company:"")+"</td>"
         +'<td class="'+cls+'" style="text-align:center;font-weight:700">'+(item.ptwNo||"")+"</td>"
@@ -364,6 +367,7 @@ function generateWeeklySummary(records,companies,wkS,wkE){
           desc,
           ptwNo:String(ptwNum(show.ptwNumber)),
           validDate:show.validDate||"-",
+          closing:(show.closingDate||"").trim(),
           wt:wtText(show.workTypes),
           noWork:false,
           expired:show.validDate&&new Date(show.validDate)<today,
@@ -586,7 +590,10 @@ function SummaryPrintView({data,records,wkLabel}){
   const today=new Date();
   const todayStr=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
 
-  const getDateColor=(vd)=>{
+  /* closing 有值＝已關閉 → 一律灰色，不再因為到期日過了就標紅；
+     紅色只留給「未填關閉日且到期日 < 出表當天」的真逾期未關單 */
+  const getDateColor=(vd,closing)=>{
+    if(closing&&String(closing).trim())return{bg:"#64748b22",fg:"#94a3b8",isRed:false,isSoon:false,isClosed:true};
     if(!vd||vd==="-")return{bg:"transparent",fg:"#e2e8f0",isRed:false,isSoon:false};
     const cmp=vd.replace(/\//g,"-");
     if(cmp<=todayStr)return{bg:"#f87171",fg:"#fff",isRed:true,isSoon:false};
@@ -664,16 +671,16 @@ function SummaryPrintView({data,records,wkLabel}){
                 body+="<td style='text-align:center;font-weight:bold'>"+item.ptwNo+"</td>";
                 body+="<td>"+item.loc+"</td>";
                 body+="<td>"+(item.noWork?"暫無工作":item.desc)+"</td>";
-                const dc=getDateColor(item.validDate);
+                const dc=getDateColor(item.validDate,item.closing);
                 const vdDisplay=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";
-                body+="<td style='text-align:center"+(dc.isRed?";background:#ff4444;color:#fff":dc.isSoon?";background:#fbbf24;color:#422006":";color:#22c55e")+";font-weight:bold'>"+vdDisplay+"</td>";
+                body+="<td style='text-align:center"+(dc.isClosed?";background:#eef1f5;color:#64748b":dc.isRed?";background:#ff4444;color:#fff":dc.isSoon?";background:#fbbf24;color:#422006":";color:#22c55e")+";font-weight:bold'>"+vdDisplay+(dc.isClosed?"<br><span style='font-size:9px;font-weight:400'>已關 "+fmtD(item.closing)+"</span>":"")+"</td>";
                 if(ii===0)body+="<td rowspan='"+co.items.length+"' style='text-align:center'>"+getUnclosed(co.company)+"</td>";
                 body+="<td style='white-space:pre-line'>"+(item.wt||"")+"</td>";
                 body+="</tr>"
               })});
               const html="<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;font-family:sans-serif;font-size:12px'><thead style='background:#e8e8e8;font-weight:bold'>"+hdr+"</thead><tbody>"+body+"</tbody></table>";
               const blob=new Blob([html],{type:"text/html"});
-              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";return[ii===0?co.company:"",item.ptwNo,item.loc,item.noWork?"暫無工作":item.desc,vd,ii===0?getUnclosed(co.company):"",(item.wt||"").replace(/\n/g,"; ")].join("\t")}).join("\n")).join("\n");
+              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";const vdTxt=vd+(item.closing?"（已關 "+fmtD(item.closing)+"）":"");return[ii===0?co.company:"",item.ptwNo,item.loc,item.noWork?"暫無工作":item.desc,vdTxt,ii===0?getUnclosed(co.company):"",(item.wt||"").replace(/\n/g,"; ")].join("\t")}).join("\n")).join("\n");
               navigator.clipboard.write([new ClipboardItem({"text/html":blob,"text/plain":new Blob([text],{type:"text/plain"})})]).then(()=>{const btn=document.getElementById("copyOk");if(btn){btn.textContent="✅ 已複製!";setTimeout(()=>btn.textContent="📋 複製表格",1500)}})
             }} id="copyOk" style={{padding:"8px 20px",borderRadius:8,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontSize:12,fontWeight:700}}>📋 複製表格</button>
             <button onClick={()=>{exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD,wkLabel)}} style={{padding:"8px 24px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#34d399,#38bdf8)",color:"#0c1220",cursor:"pointer",fontSize:13,fontWeight:800}}>🖨 輸出PDF</button>
@@ -702,7 +709,7 @@ function SummaryPrintView({data,records,wkLabel}){
                   <td style={{padding:"6px 8px",border:"1px solid #253552",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:"#38bdf8"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"ptwNo",e.target.textContent)}>{item.ptwNo}</td>
                   <td style={{padding:"6px 8px",border:"1px solid #253552"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"loc",e.target.textContent)}>{item.loc}</td>
                   <td style={{padding:"6px 8px",border:"1px solid #253552",color:item.noWork?"#94a3b8":"#e2e8f0",fontStyle:item.noWork?"italic":"normal",textAlign:item.noWork?"center":"left"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"desc",e.target.textContent)}>{item.desc}</td>
-                  <td style={{padding:"4px 6px",border:"1px solid #253552",textAlign:"center",fontWeight:700,background:getDateColor(item.validDate).bg,color:getDateColor(item.validDate).fg}}><input type="date" value={(item.validDate&&item.validDate!=="-")?item.validDate.replace(/\//g,"-"):""} onChange={e=>updateDateCell(ci,ii,e.target.value)} style={{background:"transparent",border:"none",color:"inherit",fontWeight:700,fontSize:12,textAlign:"center",width:"100%",cursor:"pointer"}}/></td>
+                  <td style={{padding:"4px 6px",border:"1px solid #253552",textAlign:"center",fontWeight:700,background:getDateColor(item.validDate,item.closing).bg,color:getDateColor(item.validDate,item.closing).fg}}><input type="date" value={(item.validDate&&item.validDate!=="-")?item.validDate.replace(/\//g,"-"):""} onChange={e=>updateDateCell(ci,ii,e.target.value)} style={{background:"transparent",border:"none",color:"inherit",fontWeight:700,fontSize:12,textAlign:"center",width:"100%",cursor:"pointer"}}/>{item.closing&&<div style={{fontSize:9,fontWeight:400,opacity:.9,marginTop:-2}}>已關 {fmtD(item.closing)}</div>}</td>
                   {ii===0&&<td rowSpan={co.items.length} style={{padding:"8px 10px",border:"1px solid #253552",textAlign:"center",verticalAlign:"top",fontWeight:700,fontSize:12}}>{getUnclosed(co.company)}</td>}
                   <td style={{padding:"6px 8px",border:"1px solid #253552",fontSize:11,whiteSpace:"pre-line",lineHeight:1.45,color:"#fbbf24"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"wt",e.target.innerText)}>{item.wt||""}</td>
                   <td style={{padding:"4px",border:"1px solid #253552",textAlign:"center"}} className="no-print">
@@ -743,7 +750,7 @@ function SummaryPrintView({data,records,wkLabel}){
               <td style={{textAlign:"center",fontWeight:700}}>{item.ptwNo}</td>
               <td>{item.loc}</td>
               <td className={item.noWork?"no-work":""}>{item.desc}</td>
-              <td style={{textAlign:"center",fontWeight:700}} className={getDateColor(item.validDate).isRed?"expired-date":getDateColor(item.validDate).isSoon?"soon-date":(item.validDate&&item.validDate!=="-"?"green-date":"")}>{item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-"}</td>
+              <td style={{textAlign:"center",fontWeight:700}} className={item.closing?"closed-date":getDateColor(item.validDate,item.closing).isRed?"expired-date":getDateColor(item.validDate,item.closing).isSoon?"soon-date":(item.validDate&&item.validDate!=="-"?"green-date":"")}>{item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-"}{item.closing&&<div style={{fontSize:8,fontWeight:400}}>已關 {fmtD(item.closing)}</div>}</td>
               {ii===0&&<td rowSpan={co.items.length} style={{textAlign:"center",fontWeight:700,verticalAlign:"top"}}>{getUnclosed(co.company)}</td>}
               <td style={{whiteSpace:"pre-line",lineHeight:1.4}}>{item.wt||""}</td>
             </tr>
