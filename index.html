@@ -136,7 +136,8 @@ function saveCosLS(c){try{localStorage.setItem(LS_COS,JSON.stringify(c))}catch(e
 const LOCS=["台中工區","通霄工區","天力管線暫置區","37號碼頭管線暫置區","通霄電廠","其他"];
 const CATS=[
   {key:"hotWork",en:"Hot Work",zh:"動火作業",pre:"HWC"},
-  {key:"electrical",en:"Electrical",zh:"電氣作業",pre:"ELC"},
+  {key:"electrical",en:"Electrical isolation",zh:"電氣隔離",pre:"ELC"},
+  {key:"processIsolation",en:"Process isolation",zh:"製程隔離",pre:"PRI"},
   {key:"diving",en:"Diving",zh:"潛水作業",pre:"DVC"},
   {key:"radiography",en:"Radiography",zh:"輻射作業",pre:"RAD"},
   {key:"confinedSpace",en:"Confined Space",zh:"局限空間",pre:"CSC"},
@@ -144,7 +145,32 @@ const CATS=[
   {key:"coldWork",en:"Cold Work",zh:"一般作業",pre:"CWC"},
 ];
 
-const empty={srNo:"",contPtwNo:"-",applyCompany:"",ptwNumber:"",issuingDate:"",closingDate:"",issuingPerson:"",startDate:"",validDate:"",applicant:"",holder:"",supervisor:"",ehs:"",location:"",workDescription:"",hotWork:"",electrical:"",diving:"",radiography:"",confinedSpace:"",excavation:"",coldWork:""};
+/* ===== 高風險作業類別 (純勾選，不編號) ===== */
+/* zh/en = 表單用全名； zs/es = 輸出欄位用簡稱 */
+const WORK_TYPES=[
+  {key:"lift",     zh:"吊掛作業(一般及關鍵吊掛)", en:"Lifting Operations (General & Critical Lifts)", zs:"吊掛作業",     es:"Lifting"},
+  {key:"tandem",   zh:"雙機同步吊掛作業",         en:"Tandem / Synchronised Lifting",                 zs:"雙機同步吊掛", es:"Tandem Lifting"},
+  {key:"heavyRot", zh:"重型設備/旋轉設備維護",    en:"Heavy / Rotating Equipment Maintenance",        zs:"重型旋轉設備維護", es:"Heavy/Rotating Equip."},
+  {key:"pressure", zh:"靜水壓/壓力試驗",          en:"Hydrostatic / Pressure Testing",                zs:"靜水壓/壓力試驗", es:"Pressure Testing"},
+  {key:"liveWork", zh:"帶電作業/送電",            en:"Live Working / Energisation",                   zs:"帶電作業/送電",  es:"Live Work"},
+  {key:"simops",   zh:"同步作業 (SIMOPS)",        en:"Simultaneous Operations (SIMOPS)",              zs:"同步作業",      es:"SIMOPS"},
+  {key:"confined", zh:"局限空間作業",             en:"Confined Space Entry",                          zs:"局限空間作業",  es:"Confined Space"},
+  {key:"energyIso",zh:"能量隔離",                 en:"Energy Isolation",                              zs:"能量隔離",      es:"Energy Isolation"},
+  {key:"excav",    zh:"開挖作業",                 en:"Excavation",                                    zs:"開挖作業",      es:"Excavation"},
+  {key:"mobileEq", zh:"操作移動式設備",           en:"Mobile Equipment Operation",                    zs:"操作移動式設備", es:"Mobile Equipment"},
+  {key:"height",   zh:"高處作業",                 en:"Work at Height",                                zs:"高處作業",      es:"Work at Height"},
+  {key:"water",    zh:"臨水或水上作業",           en:"Work Near or Over Water",                       zs:"臨水/水上作業",  es:"Work Over Water"},
+];
+/* 紀錄裡以逗號分隔的 key 字串保存，例如 "lift,height" */
+const wtKeys=(v)=>String(v||"").split(",").map(s=>s.trim()).filter(Boolean);
+const wtItems=(v)=>wtKeys(v).map(k=>WORK_TYPES.find(w=>w.key===k)).filter(Boolean);
+const wtLines=(v)=>wtItems(v).map(w=>w.zs+" "+w.es);
+const wtText=(v,sep)=>wtLines(v).join(sep||"\n");
+
+const empty={srNo:"",contPtwNo:"-",applyCompany:"",ptwNumber:"",issuingDate:"",closingDate:"",issuingPerson:"",startDate:"",validDate:"",applicant:"",holder:"",supervisor:"",ehs:"",location:"",workDescription:"",workTypes:"",hotWork:"",electrical:"",processIsolation:"",diving:"",radiography:"",confinedSpace:"",excavation:"",coldWork:""};
+/* 上傳雲端前補齊欄位：GAS 以第一筆紀錄的 keys 當表頭，缺欄位會整欄遺失 */
+const RECORD_KEYS=Object.keys(empty);
+const withSchema=(records)=>records.map(r=>{const n={};RECORD_KEYS.forEach(k=>{n[k]=r[k]!==undefined&&r[k]!==null?r[k]:""});Object.keys(r).forEach(k=>{if(!(k in n)&&k[0]!=="_")n[k]=r[k]});return n});
 const PERSONS=[{"no": 1, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "顏正安", "title": "HSE", "trainedDate": "2025-08-05", "remark": ""}, {"no": 2, "unit": "Issuing", "dept": "Supervisor (Onshore/nearshore)", "company": "NMDC", "person": "Kathrien Lien", "title": "Project Superintendent", "trainedDate": "2025-08-08", "remark": ""}, {"no": 3, "unit": "Performing", "dept": "-", "company": "Glory Wealth", "person": "許雅婷", "title": "Engineer", "trainedDate": "2025-08-05", "remark": "V"}, {"no": 4, "unit": "Performing", "dept": "-", "company": "NorthGo", "person": "陳朝海", "title": "Chairman", "trainedDate": "2025-08-05", "remark": ""}, {"no": 5, "unit": "Performing", "dept": "-", "company": "NorthGo", "person": "陳嘉俊", "title": "EHS", "trainedDate": "2025-08-05", "remark": ""}, {"no": 6, "unit": "Performing", "dept": "-", "company": "NorthGo", "person": "鮑雪兒", "title": "Operation", "trainedDate": "2025-08-05", "remark": ""}, {"no": 7, "unit": "Performing", "dept": "-", "company": "NorthGo", "person": "賴澔興", "title": "Operation", "trainedDate": "2025-08-05", "remark": ""}, {"no": 8, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "劉澤懷 Jeffery Liu", "title": "EHS", "trainedDate": "2025-08-08", "remark": ""}, {"no": 9, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "王信為 Vic Wang", "title": "EHS", "trainedDate": "2025-08-08", "remark": ""}, {"no": 10, "unit": "Issuing", "dept": "PTW coordinator", "company": "NMDC", "person": "Kong Yon Wong", "title": "EHS", "trainedDate": "2025-08-05", "remark": ""}, {"no": 11, "unit": "Performing", "dept": "-", "company": "Glory Wealth", "person": "江傑霖", "title": "Engineer", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 12, "unit": "Performing", "dept": "-", "company": "Glory Wealth", "person": "嚴心衛", "title": "Engineer", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 13, "unit": "Performing", "dept": "-", "company": "Glory Wealth", "person": "胡正得", "title": "Engineer", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 14, "unit": "Performing", "dept": "-", "company": "Glory Wealth", "person": "羅祥羽", "title": "Engineer", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 15, "unit": "Issuing", "dept": "PTW coordinator", "company": "NMDC", "person": "黃郁翔", "title": "Env engineer", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 16, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "李偉程", "title": "EHS", "trainedDate": "2025-08-13", "remark": ""}, {"no": 17, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "王錦隆", "title": "EHS", "trainedDate": "2025-08-13", "remark": "V"}, {"no": 18, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "周泰安", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 19, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "朱雅瑄", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 20, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "蔣孟清", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 21, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "陳怡君", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 22, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "鄭為謙", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 23, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "蔡正偉", "title": "Engineer", "trainedDate": "2025-08-13", "remark": ""}, {"no": 24, "unit": "Issuing", "dept": "PTW coordinator", "company": "NMDC", "person": "童保舜", "title": "Env engineer", "trainedDate": "2025-08-05", "remark": ""}, {"no": 25, "unit": "Issuing", "dept": "Supervisor(Survey)", "company": "NMDC", "person": "Daryll Enano", "title": "Chief surveyor", "trainedDate": "2025-08-15", "remark": ""}, {"no": 26, "unit": "Issuing", "dept": "Supervisor(Logistic)", "company": "NMDC", "person": "Evan Su", "title": "Logistic Superintendent", "trainedDate": "2025-08-15", "remark": ""}, {"no": 27, "unit": "Issuing", "dept": "Supervisor(Survey)", "company": "NMDC", "person": "Mok Wai Heng", "title": "Survey manager", "trainedDate": "2025-08-15", "remark": ""}, {"no": 28, "unit": "Issuing", "dept": "Supervisor(Offfshore)", "company": "NMDC", "person": "Peter Wu", "title": "Offhsore construction manager", "trainedDate": "2025-08-15", "remark": ""}, {"no": 29, "unit": "Issuing", "dept": "Supervisor (Onshore/nearshore)", "company": "NMDC", "person": "Berk", "title": "Project engineer", "trainedDate": "2025-08-19", "remark": ""}, {"no": 30, "unit": "Issuing", "dept": "Supervisor (Onshore/nearshore)", "company": "NMDC", "person": "Nandhu", "title": "Project engineer", "trainedDate": "2025-08-19", "remark": ""}, {"no": 31, "unit": "Issuing", "dept": "Supervisor (Onshore/nearshore)", "company": "NMDC", "person": "Ibrahim", "title": "Construction manager", "trainedDate": "2025-08-19", "remark": ""}, {"no": 32, "unit": "Issuing", "dept": "Supervisor (Onshore/nearshore)", "company": "NMDC", "person": "Subin", "title": "Project supervisor", "trainedDate": "2025-08-19", "remark": ""}, {"no": 33, "unit": "Performing", "dept": "-", "company": "Magitech", "person": "賴仲彥", "title": "Site manager", "trainedDate": "2025-08-25", "remark": ""}, {"no": 34, "unit": "Issuing", "dept": "Supervisor (QAQC)", "company": "NMDC", "person": "古定坤", "title": "QA/QC", "trainedDate": "2025-08-25", "remark": ""}, {"no": 35, "unit": "Issuing", "dept": "Supervisor (QAQC)", "company": "NMDC", "person": "鄭凱旭", "title": "QA/QC", "trainedDate": "2025-08-25", "remark": ""}, {"no": 36, "unit": "Issuing", "dept": "Supervisor (QAQC)", "company": "NMDC", "person": "張建華", "title": "QA/QC", "trainedDate": "2025-08-25", "remark": ""}, {"no": 37, "unit": "Issuing", "dept": "Supervisor (offshore)", "company": "NMDC", "person": "NG KAH CHANG", "title": "offshore engineer", "trainedDate": "2025-08-25", "remark": ""}, {"no": 38, "unit": "Issuing", "dept": "Supervisor (Environment)", "company": "NMDC", "person": "朱修成", "title": "Env engineer", "trainedDate": "2025-09-02", "remark": ""}, {"no": 39, "unit": "Issuing", "dept": "Supervisor (Site manager)", "company": "NMDC", "person": "鄭春淵", "title": "Site manager", "trainedDate": "2025-09-02", "remark": "V"}, {"no": 40, "unit": "Issuing", "dept": "Supervisor (Project Engineer)", "company": "NMDC", "person": "沈丞穎", "title": "Project Engineer", "trainedDate": "2025-09-02", "remark": ""}, {"no": 41, "unit": "Issuing", "dept": "Supervisor (Project Engineer)", "company": "NMDC", "person": "李尚澤", "title": "Project Engineer", "trainedDate": "2025-09-02", "remark": ""}, {"no": 42, "unit": "Issuing", "dept": "Supervisor (Site responsible person)", "company": "NMDC", "person": "柯懿軒", "title": "Site responsibl sogineer", "trainedDate": "2025-09-02", "remark": ""}, {"no": 43, "unit": "Performing", "dept": "-", "company": "高軒", "person": "嚴文愷", "title": "Site manager", "trainedDate": "2025-09-02", "remark": ""}, {"no": 44, "unit": "Issuing", "dept": "Supervisor (Site manager)", "company": "NMDC", "person": "白曉穎", "title": "Site manager", "trainedDate": "2025-09-02", "remark": ""}, {"no": 45, "unit": "Performing", "dept": "-", "company": "MGT", "person": "張瑀娟", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 46, "unit": "Performing", "dept": "-", "company": "MGT", "person": "邱小語", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 47, "unit": "Performing", "dept": "-", "company": "MGT", "person": "李宜恩", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 48, "unit": "Performing", "dept": "-", "company": "MGT", "person": "魏鴻鎮", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 49, "unit": "Performing", "dept": "-", "company": "MGT", "person": "黃紹宸", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 50, "unit": "Performing", "dept": "-", "company": "圓泰", "person": "賴勇叡", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 51, "unit": "Performing", "dept": "-", "company": "圓泰", "person": "黃柏鈞", "title": "Engineer", "trainedDate": "2025-09-09", "remark": ""}, {"no": 52, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "林綻承", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 53, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "黃連德", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 54, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "邱禹睿", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 55, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "徐凱鵬", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 56, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "賴奕杰", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 57, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "陳柏村", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 58, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "陳宗琦", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 59, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "張國勳", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 60, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "許岱揚", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 61, "unit": "Performing", "dept": "-", "company": "Hi E", "person": "陳立德", "title": "Engineer", "trainedDate": "2025-10-08", "remark": ""}, {"no": 62, "unit": "Performing", "dept": "-", "company": "GAC", "person": "周以宸", "title": "Boarding officer", "trainedDate": "2025-11-07", "remark": ""}, {"no": 63, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "張重興", "title": "Assistant VP", "trainedDate": "2025-11-07", "remark": ""}, {"no": 64, "unit": "Performing", "dept": "-", "company": "GAC", "person": "倪紹龍", "title": "Logistic Coordinator", "trainedDate": "2025-11-07", "remark": ""}, {"no": 65, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "鄭書凱", "title": "Specialist", "trainedDate": "2025-11-07", "remark": ""}, {"no": 66, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "柯慰欽", "title": "Supervisor", "trainedDate": "2025-11-07", "remark": ""}, {"no": 67, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "李永源", "title": "Deputy manager", "trainedDate": "2025-11-07", "remark": ""}, {"no": 68, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "楊琮閔", "title": "Supervisor", "trainedDate": "2025-11-07", "remark": ""}, {"no": 69, "unit": "Performing", "dept": "-", "company": "GAC/CSHS/ Cheng An", "person": "洪志強", "title": "PIC", "trainedDate": "2025-11-07", "remark": ""}, {"no": 70, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "謝承宏", "title": "EHS", "trainedDate": "2025-11-07", "remark": ""}, {"no": 71, "unit": "Performing", "dept": "-", "company": "GAC", "person": "蔡明賢", "title": "Project manager", "trainedDate": "2025-11-07", "remark": ""}, {"no": 72, "unit": "Performing", "dept": "-", "company": "GAC", "person": "賴奕源", "title": "Shipping operation", "trainedDate": "2025-11-07", "remark": ""}, {"no": 73, "unit": "Performing", "dept": "-", "company": "GAC", "person": "王志忠", "title": "Boarding officer", "trainedDate": "2025-11-07", "remark": ""}, {"no": 74, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "白閔億", "title": "Division lead", "trainedDate": "2025-11-07", "remark": ""}, {"no": 75, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "楊武智", "title": "Supervisor", "trainedDate": "2025-11-07", "remark": ""}, {"no": 76, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "王建豐", "title": "manager", "trainedDate": "2025-11-07", "remark": ""}, {"no": 77, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "顏國川", "title": "Division lead", "trainedDate": "2025-11-07", "remark": ""}, {"no": 78, "unit": "Issuing", "dept": "construction", "company": "NMDC", "person": "謝瀚庭", "title": "Project engineer", "trainedDate": "2025-11-07", "remark": ""}, {"no": 79, "unit": "Issuing", "dept": "EHS", "company": "NMDC", "person": "彭粟筠", "title": "EHS", "trainedDate": "2025-11-07", "remark": ""}, {"no": 80, "unit": "Performing", "dept": "-", "company": "GAC/CSHS", "person": "林姿伶", "title": "assistant manager", "trainedDate": "2025-11-07", "remark": ""}, {"no": 81, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "許仁豪", "title": "Specialist", "trainedDate": "2025-11-17", "remark": ""}, {"no": 82, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "姚詠騰", "title": "Supervisor", "trainedDate": "2025-11-17", "remark": ""}, {"no": 83, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "吳玫勳", "title": "Coordinator", "trainedDate": "2025-11-17", "remark": ""}, {"no": 84, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "卓美如", "title": "Coordinator", "trainedDate": "2025-11-17", "remark": ""}, {"no": 85, "unit": "Performing", "dept": "", "company": "GAC", "person": "Ryan", "title": "Intern", "trainedDate": "2025-11-17", "remark": ""}, {"no": 86, "unit": "Performing", "dept": "", "company": "GAC", "person": "宋宸憲", "title": "Manager", "trainedDate": "2025-11-17", "remark": ""}, {"no": 87, "unit": "Performing", "dept": "", "company": "Hi E", "person": "黃騰鈞", "title": "Project management", "trainedDate": "2025-11-17", "remark": ""}, {"no": 88, "unit": "Performing", "dept": "", "company": "MGT", "person": "黃彥翔", "title": "Engineer", "trainedDate": "2025-11-17", "remark": ""}, {"no": 89, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Benny Yang", "title": "Techinical Translator", "trainedDate": "2025-11-17", "remark": ""}, {"no": 90, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Vicky Tseng", "title": "Logistic engineer", "trainedDate": "2025-12-12", "remark": ""}, {"no": 91, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Jamie Tseng", "title": "Logistic engineer", "trainedDate": "2025-12-12", "remark": ""}, {"no": 92, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Carol Kao", "title": "QC inspector", "trainedDate": "2025-12-12", "remark": ""}, {"no": 93, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Tim Dai", "title": "QC inspector", "trainedDate": "2025-12-12", "remark": ""}, {"no": 94, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Allen Cheng", "title": "QA/QC", "trainedDate": "2025-12-12", "remark": ""}, {"no": 95, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "曹耿誠", "title": "Supervisor", "trainedDate": "2025-12-12", "remark": ""}, {"no": 96, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "李志國", "title": "Supervisor", "trainedDate": "2025-12-12", "remark": ""}, {"no": 97, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "程文龍", "title": "Supervisor", "trainedDate": "2025-12-12", "remark": ""}, {"no": 98, "unit": "Performing", "dept": "", "company": "BinYang", "person": "陳萱恩", "title": "Admin", "trainedDate": "2025-12-12", "remark": ""}, {"no": 99, "unit": "Performing", "dept": "", "company": "Hi E", "person": "徐雅誼", "title": "Admin", "trainedDate": "2025-12-12", "remark": ""}, {"no": 100, "unit": "Performing", "dept": "", "company": "GAC", "person": "鄭伊鈞", "title": "Site coordinator", "trainedDate": "2025-12-12", "remark": ""}, {"no": 101, "unit": "Performing", "dept": "", "company": "GAC", "person": "高尉展", "title": "Site coordinator", "trainedDate": "2025-12-12", "remark": ""}, {"no": 102, "unit": "Performing", "dept": "", "company": "GAC/Stark", "person": "蕭志偉", "title": "HSE", "trainedDate": "2025-12-12", "remark": ""}, {"no": 103, "unit": "Performing", "dept": "", "company": "GAC/Stark", "person": "范綱宏", "title": "manager", "trainedDate": "2025-12-12", "remark": ""}, {"no": 104, "unit": "Performing", "dept": "", "company": "GAC/Stark", "person": "古昌酈", "title": "manager", "trainedDate": "2025-12-12", "remark": ""}, {"no": 105, "unit": "Performing", "dept": "", "company": "GAC/Stark", "person": "李建輝", "title": "manager", "trainedDate": "2025-12-12", "remark": ""}, {"no": 106, "unit": "Performing", "dept": "", "company": "GAC/Stark", "person": "陳科賓", "title": "manager", "trainedDate": "2025-12-12", "remark": ""}, {"no": 107, "unit": "Performing", "dept": "", "company": "GAC", "person": "陳怡如", "title": "HSE", "trainedDate": "2025-12-12", "remark": ""}, {"no": 108, "unit": "Performing", "dept": "", "company": "Benline", "person": "Daria", "title": "Project manager", "trainedDate": "2025-12-30", "remark": ""}, {"no": 109, "unit": "Performing", "dept": "", "company": "Benline", "person": "Weiming", "title": "Project manager", "trainedDate": "2025-12-30", "remark": ""}, {"no": 110, "unit": "Performing", "dept": "", "company": "Benline", "person": "Russell", "title": "Marine supervisor", "trainedDate": "2025-12-30", "remark": ""}, {"no": 111, "unit": "Issuing", "dept": "", "company": "MMDC", "person": "Chiao Lin", "title": "Permit coordinator", "trainedDate": "2025-12-30", "remark": ""}, {"no": 113, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "陳聯益", "title": "Lead", "trainedDate": "2025-12-30", "remark": ""}, {"no": 114, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "張哲源", "title": "Logistic", "trainedDate": "2025-12-30", "remark": ""}, {"no": 115, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "紀誌達", "title": "Logistic", "trainedDate": "2025-12-30", "remark": ""}, {"no": 116, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "盧佑維", "title": "Logistic", "trainedDate": "2025-12-30", "remark": ""}, {"no": 117, "unit": "Performing", "dept": "", "company": "GAC/CSHS", "person": "陳孟申", "title": "Logistic", "trainedDate": "2025-12-30", "remark": ""}, {"no": 118, "unit": "Issuing", "dept": "", "company": "MMDC", "person": "何譿恩", "title": "Project engineer", "trainedDate": "2025-12-30", "remark": ""}, {"no": 119, "unit": "Performing", "dept": "", "company": "GAC", "person": "張美蓁", "title": "Interm", "trainedDate": "2026-01-08", "remark": ""}, {"no": 120, "unit": "Performing", "dept": "", "company": "GAC", "person": "劉耀駿", "title": "Logistic coordinator", "trainedDate": "2026-01-08", "remark": ""}, {"no": 121, "unit": "Performing", "dept": "", "company": "Benline", "person": "李詩婷", "title": "HSEQ", "trainedDate": "2026-01-08", "remark": ""}, {"no": 122, "unit": "Performing", "dept": "", "company": "Benline", "person": "林和明", "title": "Project Liasi Ion", "trainedDate": "2026-01-08", "remark": ""}, {"no": 123, "unit": "Performing", "dept": "", "company": "Benline", "person": "張勝閎", "title": "Executive", "trainedDate": "2026-01-08", "remark": ""}, {"no": 124, "unit": "Performing", "dept": "", "company": "Benline", "person": "韓明容", "title": "Logistic Executive", "trainedDate": "2026-01-08", "remark": ""}, {"no": 125, "unit": "Performing", "dept": "", "company": "Benline", "person": "林品堯", "title": "Executive", "trainedDate": "2026-01-08", "remark": ""}, {"no": 126, "unit": "Performing", "dept": "", "company": "Benline", "person": "Andrei KHOSHOTDIKOV", "title": "HSEQ manager", "trainedDate": "2026-01-13", "remark": ""}, {"no": 127, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "張元曦", "title": "QC inspector", "trainedDate": "2026-01-13", "remark": ""}, {"no": 128, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "王森民", "title": "QC manager(Civil)", "trainedDate": "2026-01-13", "remark": ""}, {"no": 121, "unit": "Performing", "dept": "", "company": "Benline", "person": "林君宇", "title": "Executive", "trainedDate": "2026-01-23", "remark": ""}, {"no": 122, "unit": "Performing", "dept": "", "company": "Benline", "person": "黃允聖", "title": "Senior Executive", "trainedDate": "2026-01-23", "remark": ""}, {"no": 123, "unit": "Performing", "dept": "", "company": "Benline", "person": "王家鴻", "title": "Executive", "trainedDate": "2026-01-23", "remark": ""}, {"no": 124, "unit": "Performing", "dept": "", "company": "Benline", "person": "鄭智瑋", "title": "Agent", "trainedDate": "2026-01-23", "remark": ""}, {"no": 125, "unit": "Performing", "dept": "", "company": "Benline", "person": "王欣怡", "title": "BD manager", "trainedDate": "2026-01-23", "remark": ""}, {"no": 126, "unit": "Performing", "dept": "", "company": "Benline", "person": "趙建凱", "title": "Chief engineer", "trainedDate": "2026-01-23", "remark": ""}, {"no": 127, "unit": "Performing", "dept": "", "company": "Benline", "person": "賴永智", "title": "assistant manager", "trainedDate": "2026-01-23", "remark": ""}, {"no": 128, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "彭肖瑛", "title": "Environment officer", "trainedDate": "2026-01-23", "remark": ""}, {"no": 129, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "唐郁茹", "title": "CCTV supervisor", "trainedDate": "2026-01-23", "remark": ""}, {"no": 130, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "鄭文旻", "title": "Site supervisor", "trainedDate": "2026-02-05", "remark": ""}, {"no": 131, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "Toh Lin Sid", "title": "QC inspector", "trainedDate": "2026-02-05", "remark": ""}, {"no": 132, "unit": "Issuing", "dept": "", "company": "NMDC", "person": "林志浩", "title": "PTW coordinator", "trainedDate": "2026-02-05", "remark": ""}, {"no": 133, "unit": "Performing", "dept": "", "company": "MGT", "person": "劉佑昌", "title": "Engineer", "trainedDate": "2026-02-05", "remark": ""}, {"no": 134, "unit": "Performing", "dept": "", "company": "Benline", "person": "郭文竹", "title": "Log manager", "trainedDate": "2026-02-05", "remark": ""}, {"no": 135, "unit": "Performing", "dept": "", "company": "Benline", "person": "李文銓", "title": "Executive", "trainedDate": "2026-02-05", "remark": ""}, {"no": 136, "unit": "Performing", "dept": "", "company": "Benline", "person": "陳韋綸", "title": "Senior Executive", "trainedDate": "2026-02-05", "remark": ""}];
 const P_UNITS=["Issuing","Performing"];
 const P_COS=["Benline", "BinYang", "GAC", "GAC/CSHS", "GAC/CSHS/ Cheng An", "GAC/Stark", "Glory Wealth", "Hi E", "MGT", "MMDC", "Magitech", "NMDC", "NorthGo", "圓泰", "高軒"];
@@ -155,8 +181,13 @@ function saveAliasLS(a){try{localStorage.setItem(LS_ALIAS,JSON.stringify(a))}cat
 const getPersonCos=(ptwCo,aliasMap)=>{if(!ptwCo)return null;const al=aliasMap||DEFAULT_ALIAS;const alias=al[ptwCo];if(alias)return[ptwCo,alias];if(ptwCo==="MGT")return["MGT","Magitech"];if(ptwCo==="GAC")return["GAC","GAC/CSHS","GAC/CSHS/ Cheng An","GAC/Stark"];if(ptwCo==="NMDC")return["NMDC","MMDC"];return[ptwCo]};
 /* PDF Export */
 function exportTablePDF(filtered,mode,subtitle,fmtD){
-  const rows=filtered.map(r=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""]});
-  const heads=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","DVC","RAD","CSC","EXC","CWC"];
+  const rows=filtered.map(r=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.processIsolation||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""]});
+  const heads=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"];
+  /* 週報格式才多一欄「作業類別」 */
+  if(mode==="weekly"){
+    heads.push("Work Category 作業類別");
+    rows.forEach((r,i)=>r.push(wtLines(filtered[i].workTypes).join("<br>")));
+  }
   let html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>PTW Register</title><style>
     @page{size:A3 landscape;margin:8mm}
     *{margin:0;padding:0;box-sizing:border-box}
@@ -208,7 +239,7 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
   </style></head><body>
   <h2>PTW Weekly Status Update</h2>
   <div class="sub">Generated: ${new Date().toLocaleDateString()}</div>
-  <table><thead><tr><th style="width:12%">Company</th><th style="width:20%">Location</th><th style="width:30%">Description</th><th style="width:10%">PTW No.</th><th style="width:13%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:15%">Unclosed</th></tr></thead><tbody>`;
+  <table><thead><tr><th style="width:10%">Company</th><th style="width:15%">Location</th><th style="width:26%">Description</th><th style="width:7%">PTW No.</th><th style="width:11%">Valid Date<br><span style="font-size:7px;font-weight:400">🟡即將過期 🔴已過期</span></th><th style="width:12%">Unclosed</th><th style="width:19%">Work Category<br><span style="font-size:7px;font-weight:400">作業類別</span></th></tr></thead><tbody>`;
   rows.forEach(co=>{
     const uc=getUnclosed(co.company);
     co.items.forEach((item,ii)=>{
@@ -222,6 +253,7 @@ function exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD){
         +'<td class="'+cls+'">'+(item.ptwNo||"")+"</td>"
         +'<td class="'+cls+'">'+vd+"</td>"
         +"<td>"+(ii===0?uc:"")+"</td>"
+        +'<td style="white-space:pre-line">'+(item.wt||"")+"</td>"
         +"</tr>";
     });
   });
@@ -311,16 +343,23 @@ function generateWeeklySummary(records,companies){
       const hasActive=recs.some(r=>(!r.closingDate||r.closingDate.trim()===""));
       
       if(isClosed&&!hasActive){
-        coRows.push({loc,desc:"暫無工作",ptwNo:"-",validDate:"-",noWork:true,expired:false});
+        /* 暫無工作 → 直接不列入輸出 */
+        return;
       }else{
         // show most recent active, or latest if still valid
         const activeRecs=sorted.filter(r=>!r.closingDate||r.closingDate.trim()==="");
         const show=activeRecs.length?activeRecs[0]:latest;
+        /* 同地點所有仍在執行的 PTW 之作業類別聯集 */
+        const wtSrc=activeRecs.length?activeRecs:[latest];
+        const wtUnion=[];
+        wtSrc.forEach(r=>wtKeys(r.workTypes).forEach(k=>{if(!wtUnion.includes(k))wtUnion.push(k)}));
+        wtUnion.sort((a,b)=>WORK_TYPES.findIndex(w=>w.key===a)-WORK_TYPES.findIndex(w=>w.key===b));
         coRows.push({
           loc,
           desc:(show.workDescription||"").replace(/\n/g,"、"),
           ptwNo:String(ptwNum(show.ptwNumber)),
           validDate:show.validDate||"-",
+          wt:wtText(wtUnion.join(",")),
           noWork:false,
           expired:show.validDate&&new Date(show.validDate)<today,
           expiringSoon:show.validDate&&(()=>{const v=new Date(show.validDate);const diff=(v-today)/(1000*60*60*24);return diff>=0&&diff<=3})()
@@ -328,6 +367,8 @@ function generateWeeklySummary(records,companies){
       }
     });
     
+    /* 整間公司都暫無工作 → 整列不輸出 */
+    if(!coRows.length)return;
     rows.push({
       company:co,
       items:coRows,
@@ -367,7 +408,11 @@ function ExportModal({records,onClose,companies}){
       r=r.filter(x=>{
         const uc=!x.closingDate||x.closingDate.trim()==="";
         const av=x.validDate&&new Date(x.validDate)>=today;
-        return uc||av;
+        if(!(uc||av))return false;
+        /* 暫無工作直接不輸出：工作描述空白或標註「暫無工作」 */
+        const d=(x.workDescription||"").trim();
+        if(!d||/暫無工作|無工作|no work/i.test(d))return false;
+        return true;
       });
     }
     return r;
@@ -417,7 +462,7 @@ function ExportModal({records,onClose,companies}){
             <span style={{color:"#94a3b8",fontSize:12}}>～</span>
             <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...iS,width:160,padding:"7px 10px",fontSize:12}}/>
           </div>}
-          {rOpt("weekly","📊 週報格式","Unclosed + still valid PTWs ("+records.filter(x=>(!x.closingDate||x.closingDate.trim()==="")||(x.validDate&&new Date(x.validDate)>=today)).length+" records)")}
+          {rOpt("weekly","📊 週報格式","Unclosed + still valid PTWs ("+records.filter(x=>{const d=(x.workDescription||"").trim();if(!d||/暫無工作|無工作|no work/i.test(d))return false;return(!x.closingDate||x.closingDate.trim()==="")||(x.validDate&&new Date(x.validDate)>=today)}).length+" records，不含暫無工作)")}
           {rOpt("summary","📝 每周摘要","PTW 周狀態更新 — by company & location")}
         </div>
 
@@ -443,11 +488,14 @@ function ExportModal({records,onClose,companies}){
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{setShowTablePreview(false);onClose()}} style={{padding:"8px 20px",borderRadius:8,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:12}}>← 返回</button>
             <button id="tblCopyBtn" onClick={()=>{
-              const cols=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","DVC","RAD","CSC","EXC","CWC"];
+              const wkCat=mode==="weekly";
+              const cols=["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"];
+              if(wkCat)cols.push("Work Category 作業類別");
               const hdr="<tr>"+cols.map(h=>"<th>"+h+"</th>").join("")+"</tr>";
-              const body=filtered.map(r=>{const fc=fmtClose(r.closingDate,r.validDate);return"<tr><td>"+[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""].join("</td><td>")+"</td></tr>"}).join("");
+              const cells=(r)=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.processIsolation||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""]};
+              const body=filtered.map(r=>{const a=cells(r);if(wkCat)a.push(wtLines(r.workTypes).join("<br>"));return"<tr><td>"+a.join("</td><td>")+"</td></tr>"}).join("");
               const html="<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;font-family:sans-serif;font-size:11px'><thead style='background:#e8e8e8;font-weight:bold'>"+hdr+"</thead><tbody>"+body+"</tbody></table>";
-              const text=cols.join("\t")+"\n"+filtered.map(r=>{const fc=fmtClose(r.closingDate,r.validDate);return[r.srNo,r.ptwNumber,r.contPtwNo!=="-"?r.contPtwNo:"",r.applyCompany,fmtD(r.issuingDate),fc.text,fmtD(r.startDate),fmtD(r.validDate),r.applicant,r.holder,r.supervisor,r.ehs,(r.location||"").replace(/\n/g," "),(r.workDescription||"").replace(/\n/g," "),r.hotWork||"",r.electrical||"",r.diving||"",r.radiography||"",r.confinedSpace||"",r.excavation||"",r.coldWork||""].join("\t")}).join("\n");
+              const text=cols.join("\t")+"\n"+filtered.map(r=>{const a=cells(r);if(wkCat)a.push(wtLines(r.workTypes).join("; "));return a.join("\t")}).join("\n");
               navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]).then(()=>{const b=document.getElementById("tblCopyBtn");if(b){b.textContent="✅ 已複製!";setTimeout(()=>b.textContent="📋 複製表格",1500)}})
             }} style={{padding:"8px 20px",borderRadius:8,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontSize:12,fontWeight:700}}>📋 複製表格</button>
             <button onClick={()=>{
@@ -470,7 +518,7 @@ function ExportModal({records,onClose,companies}){
           <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"#1a2744"}}>
-              {["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","DVC","RAD","CSC","EXC","CWC"].map(h=>
+              {["#","PTW No.","Cont.","Company","Issue","Close","Start","Valid","Applicant","Holder","Supv.","EHS","Location","Description","HWC","ELC","PRI","DVC","RAD","CSC","EXC","CWC"].concat(mode==="weekly"?["Work Category 作業類別"]:[]).map(h=>
                 <th key={h} style={{padding:"8px 5px",fontSize:10,fontWeight:700,color:"#94a3b8",textAlign:"left",borderBottom:"2px solid #253552",whiteSpace:"nowrap"}}>{h}</th>
               )}
             </tr></thead>
@@ -494,11 +542,13 @@ function ExportModal({records,onClose,companies}){
                 <td style={{padding:"6px 5px",fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:"1.4"}}>{(r.workDescription||"")}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.hotWork||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.electrical||""}</td>
+                <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.processIsolation||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.diving||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.radiography||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.confinedSpace||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.excavation||""}</td>
                 <td style={{padding:"6px 5px",fontSize:10,textAlign:"center"}}>{r.coldWork||""}</td>
+                {mode==="weekly"&&<td style={{padding:"6px 5px",fontSize:10,whiteSpace:"pre-line",lineHeight:"1.4",minWidth:150}}>{wtText(r.workTypes)}</td>}
               </tr>)
             })}</tbody>
           </table>
@@ -570,7 +620,7 @@ function SummaryPrintView({data,records}){
   const addRow=(coIdx)=>{
     setRows(prev=>{
       const n=[...prev];
-      n[coIdx]={...n[coIdx],items:[...n[coIdx].items,{loc:"",desc:"",ptwNo:"-",validDate:"-",noWork:false,expired:false}]};
+      n[coIdx]={...n[coIdx],items:[...n[coIdx].items,{loc:"",desc:"",ptwNo:"-",validDate:"-",wt:"",noWork:false,expired:false}]};
       return n;
     });
   };
@@ -591,7 +641,7 @@ function SummaryPrintView({data,records}){
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>window.history.length>1?window.location.reload():window.location.reload()} style={{padding:"8px 20px",borderRadius:8,border:"1px solid #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:12}}>← 返回</button>
             <button onClick={()=>{
-              const hdr="<tr><th>包商名稱</th><th>工作地點</th><th>預計工作內容</th><th>許可號碼</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th></tr>";
+              const hdr="<tr><th>包商名稱</th><th>工作地點</th><th>預計工作內容</th><th>許可號碼</th><th>許可到期日<br><span style='font-size:9px;font-weight:400'>🟡即將過期 🔴已過期</span></th><th>未關數量(號碼)</th><th>作業類別<br><span style='font-size:9px;font-weight:400'>Work Category</span></th></tr>";
               let body="";
               rows.forEach(co=>{co.items.forEach((item,ii)=>{
                 body+="<tr>";
@@ -603,11 +653,12 @@ function SummaryPrintView({data,records}){
                 const vdDisplay=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";
                 body+="<td style='text-align:center"+(dc.isRed?";background:#ff4444;color:#fff":dc.isSoon?";background:#fbbf24;color:#422006":";color:#22c55e")+";font-weight:bold'>"+vdDisplay+"</td>";
                 if(ii===0)body+="<td rowspan='"+co.items.length+"' style='text-align:center'>"+getUnclosed(co.company)+"</td>";
+                body+="<td style='white-space:pre-line'>"+(item.wt||"")+"</td>";
                 body+="</tr>"
               })});
               const html="<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;font-family:sans-serif;font-size:12px'><thead style='background:#e8e8e8;font-weight:bold'>"+hdr+"</thead><tbody>"+body+"</tbody></table>";
               const blob=new Blob([html],{type:"text/html"});
-              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";return[ii===0?co.company:"",item.loc,item.noWork?"暫無工作":item.desc,item.ptwNo,vd,ii===0?getUnclosed(co.company):""].join("\t")}).join("\n")).join("\n");
+              const text=rows.map(co=>co.items.map((item,ii)=>{const vd=item.validDate&&item.validDate!=="-"?(()=>{try{const dt=new Date(item.validDate);return dt.getFullYear()+"/"+(dt.getMonth()+1).toString().padStart(2,"0")+"/"+dt.getDate().toString().padStart(2,"0")}catch{return item.validDate}})():"-";return[ii===0?co.company:"",item.loc,item.noWork?"暫無工作":item.desc,item.ptwNo,vd,ii===0?getUnclosed(co.company):"",(item.wt||"").replace(/\n/g,"; ")].join("\t")}).join("\n")).join("\n");
               navigator.clipboard.write([new ClipboardItem({"text/html":blob,"text/plain":new Blob([text],{type:"text/plain"})})]).then(()=>{const btn=document.getElementById("copyOk");if(btn){btn.textContent="✅ 已複製!";setTimeout(()=>btn.textContent="📋 複製表格",1500)}})
             }} id="copyOk" style={{padding:"8px 20px",borderRadius:8,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontSize:12,fontWeight:700}}>📋 複製表格</button>
             <button onClick={()=>{exportSummaryPDF(rows,getUnclosed,getDateColor,fmtD)}} style={{padding:"8px 24px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#34d399,#38bdf8)",color:"#0c1220",cursor:"pointer",fontSize:13,fontWeight:800}}>🖨 輸出PDF</button>
@@ -620,13 +671,14 @@ function SummaryPrintView({data,records}){
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{background:"#1a2744"}}>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"8%"}}>包商名稱</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"12%"}}>工作地點</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"40%"}}>預計工作內容</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"8%"}}>許可號碼</th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"12%"}}>許可到期日<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>🟡即將過期 🔴已過期</div></th>
-              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"14%"}}>未關數量(號碼)</th>
-              <th style={{padding:"10px 6px",border:"1px solid #253552",fontWeight:700,width:"6%"}} className="no-print">操作</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>包商名稱</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"10%"}}>工作地點</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"30%"}}>預計工作內容</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"7%"}}>許可號碼</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"11%"}}>許可到期日<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>🟡即將過期 🔴已過期</div></th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"12%"}}>未關數量(號碼)</th>
+              <th style={{padding:"10px 12px",border:"1px solid #253552",fontWeight:700,width:"18%"}}>作業類別<div style={{fontSize:9,fontWeight:400,color:"#94a3b8",marginTop:2}}>Work Category</div></th>
+              <th style={{padding:"10px 6px",border:"1px solid #253552",fontWeight:700,width:"5%"}} className="no-print">操作</th>
             </tr></thead>
             <tbody>
               {rows.map((co,ci)=>co.items.map((item,ii)=>(
@@ -637,6 +689,7 @@ function SummaryPrintView({data,records}){
                   <td style={{padding:"6px 8px",border:"1px solid #253552",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:"#38bdf8"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"ptwNo",e.target.textContent)}>{item.ptwNo}</td>
                   <td style={{padding:"4px 6px",border:"1px solid #253552",textAlign:"center",fontWeight:700,background:getDateColor(item.validDate).bg,color:getDateColor(item.validDate).fg}}><input type="date" value={(item.validDate&&item.validDate!=="-")?item.validDate.replace(/\//g,"-"):""} onChange={e=>updateDateCell(ci,ii,e.target.value)} style={{background:"transparent",border:"none",color:"inherit",fontWeight:700,fontSize:12,textAlign:"center",width:"100%",cursor:"pointer"}}/></td>
                   {ii===0&&<td rowSpan={co.items.length} style={{padding:"8px 10px",border:"1px solid #253552",textAlign:"center",verticalAlign:"top",fontWeight:700,fontSize:12}}>{getUnclosed(co.company)}</td>}
+                  <td style={{padding:"6px 8px",border:"1px solid #253552",fontSize:11,whiteSpace:"pre-line",lineHeight:1.45,color:"#fbbf24"}} contentEditable suppressContentEditableWarning className="editable-cell" onBlur={e=>updateCell(ci,ii,"wt",e.target.innerText)}>{item.wt||""}</td>
                   <td style={{padding:"4px",border:"1px solid #253552",textAlign:"center"}} className="no-print">
                     <button onClick={()=>removeRow(ci,ii)} style={{width:22,height:22,borderRadius:4,border:"1px solid #f8717133",background:"#f8717111",color:"#f87171",cursor:"pointer",fontSize:10}}>✕</button>
                   </td>
@@ -644,7 +697,7 @@ function SummaryPrintView({data,records}){
               )))}
               {rows.map((co,ci)=>(
                 <tr key={"add-"+ci} className="no-print">
-                  <td colSpan={7} style={{padding:"4px 8px",border:"1px solid #253552"}}>
+                  <td colSpan={8} style={{padding:"4px 8px",border:"1px solid #253552"}}>
                     <button onClick={()=>addRow(ci)} style={{padding:"3px 12px",borderRadius:4,border:"1px dashed #253552",background:"transparent",color:"#94a3b8",cursor:"pointer",fontSize:11}}>+ 新增 {co.company} 列</button>
                   </td>
                 </tr>
@@ -660,12 +713,13 @@ function SummaryPrintView({data,records}){
       <div className="print-title">PTW 周狀態更新 {fmtD(new Date().toISOString().slice(0,10))}</div>
       <table className="summary-table">
         <thead><tr>
-          <th style={{width:"8%"}}>包商名稱</th>
-          <th style={{width:"12%"}}>工作地點</th>
-          <th style={{width:"40%"}}>預計工作內容</th>
-          <th style={{width:"8%"}}>許可號碼</th>
-          <th style={{width:"14%"}}>許可到期日<div style={{fontSize:8,fontWeight:400,marginTop:2}}>🟡即將過期 🔴已過期</div></th>
-          <th style={{width:"14%"}}>未關數量(號碼)</th>
+          <th style={{width:"7%"}}>包商名稱</th>
+          <th style={{width:"10%"}}>工作地點</th>
+          <th style={{width:"30%"}}>預計工作內容</th>
+          <th style={{width:"7%"}}>許可號碼</th>
+          <th style={{width:"12%"}}>許可到期日<div style={{fontSize:8,fontWeight:400,marginTop:2}}>🟡即將過期 🔴已過期</div></th>
+          <th style={{width:"12%"}}>未關數量(號碼)</th>
+          <th style={{width:"22%"}}>作業類別<div style={{fontSize:8,fontWeight:400,marginTop:2}}>Work Category</div></th>
         </tr></thead>
         <tbody>
           {rows.map((co,ci)=>co.items.map((item,ii)=>(
@@ -676,6 +730,7 @@ function SummaryPrintView({data,records}){
               <td style={{textAlign:"center",fontWeight:700}}>{item.ptwNo}</td>
               <td style={{textAlign:"center",fontWeight:700}} className={getDateColor(item.validDate).isRed?"expired-date":getDateColor(item.validDate).isSoon?"soon-date":(item.validDate&&item.validDate!=="-"?"green-date":"")}>{item.validDate&&item.validDate!=="-"?fmtD(item.validDate):"-"}</td>
               {ii===0&&<td rowSpan={co.items.length} style={{textAlign:"center",fontWeight:700,verticalAlign:"top"}}>{getUnclosed(co.company)}</td>}
+              <td style={{whiteSpace:"pre-line",lineHeight:1.4}}>{item.wt||""}</td>
             </tr>
           )))}
         </tbody>
@@ -1007,7 +1062,7 @@ function App(){
     if(!APPS_SCRIPT_URL){show("💾 已儲存 ("+records.length+" 筆紀錄, "+persons.length+" 位人員)");return}
     show("💾 已儲存，正在同步雲端...");setCloudLoading(true);
     try{
-      const r1=await cloudUpload("PTW",records);
+      const r1=await cloudUpload("PTW",withSchema(records));
       const r2=await cloudUpload("Persons",persons);
       if(r1.error||r2.error){show("⚠️ 本機已存，雲端部分失敗: "+(r1.error||"")+" "+(r2.error||""))}
       else{show("💾☁️ 已儲存並同步雲端 (PTW "+records.length+" 筆, 人員 "+persons.length+" 筆)")}
@@ -1079,7 +1134,7 @@ function App(){
     if(!APPS_SCRIPT_URL){show("⚠️ 尚未設定雲端同步網址，請參考教學文件");return}
     setSyncing(true);
     try{
-      const r1=await cloudUpload("PTW",records);
+      const r1=await cloudUpload("PTW",withSchema(records));
       const r2=await cloudUpload("Persons",persons);
       if(r1.error||r2.error){show("⚠️ 部分失敗: "+(r1.error||"")+" "+(r2.error||""))}
       else{show("☁️ 上傳成功！PTW "+records.length+" 筆, 人員 "+persons.length+" 筆")}
@@ -1119,6 +1174,15 @@ function App(){
     setForm(p=>{
       if(p[cat.key]&&p[cat.key].trim())return{...p,[cat.key]:""};
       return{...p,[cat.key]:getNextCertNum(records,cat.key,cat.pre)};
+    });
+  };
+  const toggleWT=(wt)=>{
+    setForm(p=>{
+      const cur=wtKeys(p.workTypes);
+      const next=cur.includes(wt.key)?cur.filter(k=>k!==wt.key):[...cur,wt.key];
+      /* 依 WORK_TYPES 原始順序排序，輸出才穩定 */
+      next.sort((a,b)=>WORK_TYPES.findIndex(w=>w.key===a)-WORK_TYPES.findIndex(w=>w.key===b));
+      return{...p,workTypes:next.join(",")};
     });
   };
   const submit=()=>{
@@ -1258,6 +1322,25 @@ function App(){
               );
             })}
           </div>
+          <Sec icon="⚠️" zh="作業類別" en="Work Categories (可多選 / multi-select)" color="#fbbf24"/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10,marginBottom:12}}>
+            {WORK_TYPES.map((wt,i)=>{
+              const on=wtKeys(form.workTypes).includes(wt.key);
+              return(
+                <div key={wt.key} onClick={()=>toggleWT(wt)} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderRadius:10,border:"1px solid "+(on?"#fbbf2466":c.border),background:on?"#fbbf2412":c.input,cursor:"pointer",userSelect:"none"}}>
+                  <div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(on?"#fbbf24":c.border),background:on?"#fbbf24":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#422006",fontWeight:900,flexShrink:0}}>{on?"✓":""}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:on?"#fbbf24":c.text,lineHeight:1.35}}><span style={{color:on?"#fbbf24":c.dim,fontFamily:"'JetBrains Mono',monospace",fontSize:10,marginRight:4}}>{String(i+1).padStart(2,"0")}</span>{wt.zh}</div>
+                    <div style={{fontSize:10,color:c.dim,marginTop:2,lineHeight:1.3}}>{wt.en}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {wtKeys(form.workTypes).length>0&&<div style={{marginBottom:24,padding:"10px 14px",borderRadius:10,background:"#fbbf2410",border:"1px solid #fbbf2433",fontSize:11,color:"#fbbf24"}}>
+            已勾選 {wtKeys(form.workTypes).length} 項：{wtLines(form.workTypes).join("； ")}
+          </div>}
+          {wtKeys(form.workTypes).length===0&&<div style={{marginBottom:24}}/>}
           <div style={{display:"flex",gap:10,justifyContent:"flex-end",borderTop:"1px solid "+c.border,paddingTop:18}}>
             <button onClick={()=>{setForm({...empty,ptwNumber:getNextPTW(records)});setEditIdx(null)}} style={{padding:"10px 24px",borderRadius:8,border:"1px solid "+c.border,background:"transparent",color:c.dim,cursor:"pointer",fontSize:13}}>清除</button>
             <button onClick={()=>setView("preview")} style={{padding:"10px 24px",borderRadius:8,border:"1px solid "+c.accent+"44",background:c.accent+"15",color:c.accent,cursor:"pointer",fontSize:13}}>👁 預覽</button>
@@ -1813,6 +1896,9 @@ function PreviewView({form,setView,activeCerts,c}){
         {form.contPtwNo&&form.contPtwNo!=="-"&&<div style={{background:c.warn+"11",border:"1px solid "+c.warn+"33",borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:c.warn}}>🔗 延續自: <strong>{form.contPtwNo}</strong></div>}
         {activeCerts.length>0&&<div><div style={{fontSize:11,fontWeight:700,color:c.dim,marginBottom:8}}>📜 額外證書</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{activeCerts.map(x=><div key={x.key} style={{background:"#34d39915",border:"1px solid #34d39933",borderRadius:6,padding:"6px 12px",fontSize:12}}><span style={{color:c.dim,fontSize:10}}>{x.zh}</span><div style={{fontWeight:700,color:"#34d399",marginTop:1}}>{form[x.key]}</div></div>)}</div>
+        </div>}
+        {wtItems(form.workTypes).length>0&&<div style={{marginTop:16}}><div style={{fontSize:11,fontWeight:700,color:c.dim,marginBottom:8}}>⚠️ 作業類別 Work Categories</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{wtItems(form.workTypes).map(w=><div key={w.key} style={{background:"#fbbf2415",border:"1px solid #fbbf2433",borderRadius:6,padding:"6px 12px",fontSize:12}}><div style={{fontWeight:700,color:"#fbbf24"}}>{w.zh}</div><div style={{color:c.dim,fontSize:10,marginTop:1}}>{w.en}</div></div>)}</div>
         </div>}
       </div>
     </div>
