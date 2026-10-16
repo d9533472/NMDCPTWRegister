@@ -306,9 +306,12 @@ function reportWeek(base){
   return{s,e};
 }
 const dOnly=(v)=>{if(!v)return null;const pp=String(v).replace(/\//g,"-").split("-").map(Number);if(pp.length<3||isNaN(pp[0]))return null;const d=new Date(pp[0],pp[1]-1,pp[2]);d.setHours(0,0,0,0);return d};
-/* 這筆 PTW 的效期是否與本週有交集 */
+/* 這筆 PTW 要列入本週：效期與本週有交集，或核發日落在本週
+   （本週五核發、下週一才開工的許可也算本週的，不然會整批漏掉） */
 function inWeek(r,wkS,wkE){
-  const st=dOnly(r.startDate)||dOnly(r.issuingDate);
+  const iss=dOnly(r.issuingDate);
+  if(iss&&iss>=wkS&&iss<=wkE)return true;
+  const st=dOnly(r.startDate)||iss;
   const vd=dOnly(r.validDate)||st;
   if(!st&&!vd)return false;
   const a=st||vd, b=vd||st;
